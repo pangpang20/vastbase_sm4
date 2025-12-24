@@ -15,7 +15,7 @@ vastbase_sm4/
 ## sm4_c - VastBase数据库扩展
 
 **技术栈**: C语言 + PostgreSQL扩展框架  
-**目标平台**: VastBase数据库 / PostgreSQL  
+**目标平台**: VastBase数据库
 **加密算法**: SM4国密算法（GB/T 32907-2016标准）
 
 ### 主要功能
@@ -79,7 +79,7 @@ SELECT sm4_encrypt_cbc('sensitive data', 'mykey1234567890', '1234567890abcdef');
 ## sm4_java - MRS Hive UDF函数
 
 **技术栈**: Java 17 + Maven + BouncyCastle  
-**目标平台**: Apache Hive 3.1.3+  
+**目标平台**: MRS Hive 3.1.3+  
 **加密算法**: SM4国密算法（与数据库扩展完全兼容）
 
 ### C主要功能
@@ -150,12 +150,12 @@ FROM users_encrypted;
 - ✅ 数据迁移加密处理
 - ✅ 批量数据加解密
 
-📖 **详细文档**: 查看 [sm4_java/README.md](sm4_java/README.md)  
-🚀 **快速开始**: 查看 [sm4_java/QUICKSTART.md](sm4_java/QUICKSTART.md)
+**详细文档**: 查看 [sm4_java/README.md](sm4_java/README.md)  
+**快速开始**: 查看 [sm4_java/QUICKSTART.md](sm4_java/QUICKSTART.md)
 
 ---
 
-## 🔗 两个实现的关系
+## 两个实现的关系
 
 ### 兼容性
 
