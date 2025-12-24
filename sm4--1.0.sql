@@ -4,7 +4,7 @@
 -- ECB模式加密 (返回bytea)
 CREATE OR REPLACE FUNCTION sm4_encrypt(plaintext text, key text)
 RETURNS bytea
-AS 'MODULE_PATHNAME', 'sm4_encrypt'
+AS '/home/vastbase/vasthome/lib/postgresql/sm4', 'sm4_encrypt'
 LANGUAGE C STRICT IMMUTABLE;
 
 COMMENT ON FUNCTION sm4_encrypt(text, text) IS 
@@ -13,7 +13,7 @@ COMMENT ON FUNCTION sm4_encrypt(text, text) IS
 -- ECB模式解密
 CREATE OR REPLACE FUNCTION sm4_decrypt(ciphertext bytea, key text)
 RETURNS text
-AS 'MODULE_PATHNAME', 'sm4_decrypt'
+AS '/home/vastbase/vasthome/lib/postgresql/sm4', 'sm4_decrypt'
 LANGUAGE C STRICT IMMUTABLE;
 
 COMMENT ON FUNCTION sm4_decrypt(bytea, text) IS 
@@ -22,7 +22,7 @@ COMMENT ON FUNCTION sm4_decrypt(bytea, text) IS
 -- CBC模式加密
 CREATE OR REPLACE FUNCTION sm4_encrypt_cbc(plaintext text, key text, iv text)
 RETURNS bytea
-AS 'MODULE_PATHNAME', 'sm4_encrypt_cbc'
+AS '/home/vastbase/vasthome/lib/postgresql/sm4', 'sm4_encrypt_cbc'
 LANGUAGE C STRICT IMMUTABLE;
 
 COMMENT ON FUNCTION sm4_encrypt_cbc(text, text, text) IS 
@@ -31,7 +31,7 @@ COMMENT ON FUNCTION sm4_encrypt_cbc(text, text, text) IS
 -- CBC模式解密
 CREATE OR REPLACE FUNCTION sm4_decrypt_cbc(ciphertext bytea, key text, iv text)
 RETURNS text
-AS 'MODULE_PATHNAME', 'sm4_decrypt_cbc'
+AS '/home/vastbase/vasthome/lib/postgresql/sm4', 'sm4_decrypt_cbc'
 LANGUAGE C STRICT IMMUTABLE;
 
 COMMENT ON FUNCTION sm4_decrypt_cbc(bytea, text, text) IS 
@@ -40,7 +40,7 @@ COMMENT ON FUNCTION sm4_decrypt_cbc(bytea, text, text) IS
 -- ECB模式加密 (返回十六进制字符串)
 CREATE OR REPLACE FUNCTION sm4_encrypt_hex(plaintext text, key text)
 RETURNS text
-AS 'MODULE_PATHNAME', 'sm4_encrypt_hex'
+AS '/home/vastbase/vasthome/lib/postgresql/sm4', 'sm4_encrypt_hex'
 LANGUAGE C STRICT IMMUTABLE;
 
 COMMENT ON FUNCTION sm4_encrypt_hex(text, text) IS 
@@ -49,7 +49,7 @@ COMMENT ON FUNCTION sm4_encrypt_hex(text, text) IS
 -- ECB模式解密 (输入十六进制字符串)
 CREATE OR REPLACE FUNCTION sm4_decrypt_hex(ciphertext_hex text, key text)
 RETURNS text
-AS 'MODULE_PATHNAME', 'sm4_decrypt_hex'
+AS '/home/vastbase/vasthome/lib/postgresql/sm4', 'sm4_decrypt_hex'
 LANGUAGE C STRICT IMMUTABLE;
 
 COMMENT ON FUNCTION sm4_decrypt_hex(text, text) IS 

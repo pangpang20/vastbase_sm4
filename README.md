@@ -39,15 +39,45 @@ vb_ctl restart
 
 ## 启用扩展
 
+VastBase不支持EXTENSION语法，需直接执行SQL创建函数：
+
+```bash
+# 连接数据库并执行SQL文件
+vsql -d postgres -f /home/vastbase/vasthome/share/postgresql/extension/sm4--1.0.sql
+```
+
+或手动执行：
+
 ```sql
 -- 连接数据库
 vsql -d postgres
 
--- 创建扩展
-CREATE EXTENSION sm4;
+-- 创建SM4函数
+CREATE OR REPLACE FUNCTION sm4_encrypt(plaintext text, key text)
+RETURNS bytea AS '$libdir/sm4', 'sm4_encrypt' LANGUAGE C STRICT IMMUTABLE;
 
--- 删除扩展
-DROP EXTENSION sm4;
+CREATE OR REPLACE FUNCTION sm4_decrypt(ciphertext bytea, key text)
+RETURNS text AS '$libdir/sm4', 'sm4_decrypt' LANGUAGE C STRICT IMMUTABLE;
+
+CREATE OR REPLACE FUNCTION sm4_encrypt_hex(plaintext text, key text)
+RETURNS text AS '$libdir/sm4', 'sm4_encrypt_hex' LANGUAGE C STRICT IMMUTABLE;
+
+CREATE OR REPLACE FUNCTION sm4_decrypt_hex(ciphertext_hex text, key text)
+RETURNS text AS '$libdir/sm4', 'sm4_decrypt_hex' LANGUAGE C STRICT IMMUTABLE;
+
+CREATE OR REPLACE FUNCTION sm4_encrypt_cbc(plaintext text, key text, iv text)
+RETURNS bytea AS '$libdir/sm4', 'sm4_encrypt_cbc' LANGUAGE C STRICT IMMUTABLE;
+
+CREATE OR REPLACE FUNCTION sm4_decrypt_cbc(ciphertext bytea, key text, iv text)
+RETURNS text AS '$libdir/sm4', 'sm4_decrypt_cbc' LANGUAGE C STRICT IMMUTABLE;
+
+-- 删除函数
+DROP FUNCTION IF EXISTS sm4_encrypt(text, text);
+DROP FUNCTION IF EXISTS sm4_decrypt(bytea, text);
+DROP FUNCTION IF EXISTS sm4_encrypt_hex(text, text);
+DROP FUNCTION IF EXISTS sm4_decrypt_hex(text, text);
+DROP FUNCTION IF EXISTS sm4_encrypt_cbc(text, text, text);
+DROP FUNCTION IF EXISTS sm4_decrypt_cbc(bytea, text, text);
 ```
 
 ## 函数说明
