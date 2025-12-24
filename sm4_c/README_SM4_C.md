@@ -5,14 +5,15 @@
 ## 文件结构
 
 ```
-├── sm4.h          # SM4算法头文件
-├── sm4.c          # SM4算法实现
-├── sm4_ext.c      # VastBase扩展接口
-├── sm4.control    # 扩展控制文件
-├── sm4--1.0.sql   # SQL函数定义
-├── Makefile       # 编译配置
-├── install.sh     # 安装脚本
-└── test_sm4.sql   # 测试脚本
+├── sm4.h               # SM4算法头文件
+├── sm4.c               # SM4算法实现
+├── sm4_ext.c           # VastBase扩展接口
+├── sm4.control         # 扩展控制文件
+├── sm4--1.0.sql        # SQL函数定义
+├── Makefile            # 编译配置
+├── test_sm4.sql        # 测试脚本
+├── demo_citizen_data.sql # 示例数据
+└── README_SM4_C.md     # 使用文档
 ```
 
 ## 编译安装
