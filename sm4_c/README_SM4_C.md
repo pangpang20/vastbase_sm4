@@ -140,5 +140,13 @@ SELECT sm4_encrypt_hex('敏感数据', '0123456789abcdef0123456789abcdef');
 -- 运行测试脚本
 vsql -d postgres -f test_sm4.sql
 
-psql -d postgres -f demo_citizen_data.sql
+vsql -d postgres -f demo_citizen_data.sql
 ```
+
+测试结果1：
+
+![测试结果1](image.png)
+
+测试结果2：
+
+![测试结果2](image-1.png)
