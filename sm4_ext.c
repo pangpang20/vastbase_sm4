@@ -11,10 +11,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 PG_MODULE_MAGIC;
 
 /* 函数声明 */
@@ -447,7 +443,3 @@ sm4_decrypt_hex(PG_FUNCTION_ARGS)
 
     PG_RETURN_TEXT_P(result);
 }
-
-#ifdef __cplusplus
-}
-#endif

@@ -16,9 +16,8 @@ PG_CONFIG = $(VBHOME)/bin/pg_config
 PGXS := $(shell $(PG_CONFIG) --pgxs)
 
 # 编译选项
+CC = gcc
 PG_CPPFLAGS = -I$(VBHOME)/include/postgresql/server
-PG_CXXFLAGS = -std=c++11
-override CXXFLAGS := $(filter-out -std=c++14,$(CXXFLAGS)) -std=c++11
 SHLIB_LINK =
 
 # 目标库名
