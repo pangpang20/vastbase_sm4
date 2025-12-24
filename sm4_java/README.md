@@ -2,7 +2,7 @@
 
 基于Java 17的SM4国密加解密Hive UDF函数，支持ECB和CBC两种加密模式，与VastBase数据库SM4扩展完全兼容。
 
-## 📋 项目信息
+## 项目信息
 
 - **项目名称**: vastbase-sm4-hive-udf
 - **版本**: 1.0.0
@@ -11,7 +11,7 @@
 - **加密算法**: SM4（国密算法）
 - **支持模式**: ECB、CBC
 
-## 🚀 快速开始
+## 快速开始
 
 ### 1. 环境要求
 
@@ -39,7 +39,8 @@ mvn clean package
 ```
 
 **编译成功标志**:
-```
+
+```text
 [INFO] BUILD SUCCESS
 [INFO] ------------------------------------------------------------------------
 [INFO] Total time:  XX.XXX s
@@ -90,22 +91,25 @@ DESC FUNCTION sm4_encrypt_ecb;
 DESC FUNCTION EXTENDED sm4_encrypt_ecb;
 ```
 
-## 📖 函数使用说明
+## 函数使用说明
 
 ### 1. sm4_encrypt_ecb - ECB模式加密
 
 **语法**:
+
 ```sql
 sm4_encrypt_ecb(plaintext STRING, key STRING) RETURNS STRING
 ```
 
 **参数**:
+
 - `plaintext`: 明文字符串
 - `key`: 加密密钥（16字节字符串或32位十六进制）
 
 **返回**: Base64编码的密文字符串
 
 **示例**:
+
 ```sql
 -- 基本加密
 SELECT sm4_encrypt_ecb('13800138001', 'mykey1234567890') AS encrypted_phone;
@@ -128,17 +132,20 @@ FROM citizen_info;
 ### 2. sm4_decrypt_ecb - ECB模式解密
 
 **语法**:
+
 ```sql
 sm4_decrypt_ecb(ciphertext STRING, key STRING) RETURNS STRING
 ```
 
 **参数**:
+
 - `ciphertext`: Base64编码的密文字符串
 - `key`: 解密密钥（必须与加密时的密钥一致）
 
 **返回**: 解密后的明文字符串
 
 **示例**:
+
 ```sql
 -- 基本解密
 SELECT sm4_decrypt_ecb('base64_encrypted_data', 'mykey1234567890') AS phone;
@@ -159,11 +166,13 @@ WHERE sm4_decrypt_ecb(encrypted_phone, 'mykey1234567890') = '13800138001';
 ### 3. sm4_encrypt_cbc - CBC模式加密
 
 **语法**:
+
 ```sql
 sm4_encrypt_cbc(plaintext STRING, key STRING, iv STRING) RETURNS STRING
 ```
 
 **参数**:
+
 - `plaintext`: 明文字符串
 - `key`: 加密密钥（16字节）
 - `iv`: 初始向量（16字节，增强安全性）
@@ -171,6 +180,7 @@ sm4_encrypt_cbc(plaintext STRING, key STRING, iv STRING) RETURNS STRING
 **返回**: Base64编码的密文字符串
 
 **示例**:
+
 ```sql
 -- CBC模式加密
 SELECT sm4_encrypt_cbc(
@@ -183,11 +193,13 @@ SELECT sm4_encrypt_cbc(
 ### 4. sm4_decrypt_cbc - CBC模式解密
 
 **语法**:
+
 ```sql
 sm4_decrypt_cbc(ciphertext STRING, key STRING, iv STRING) RETURNS STRING
 ```
 
 **示例**:
+
 ```sql
 -- CBC模式解密
 SELECT sm4_decrypt_cbc(
@@ -198,7 +210,7 @@ SELECT sm4_decrypt_cbc(
 FROM encrypted_table;
 ```
 
-## 💡 完整使用示例
+## 完整使用示例
 
 ### 场景1: 创建加密表
 
@@ -353,7 +365,7 @@ FROM legacy_data_encrypted
 LIMIT 10;
 ```
 
-## 🔐 安全最佳实践
+## 安全最佳实践
 
 ### 1. 密钥管理
 
@@ -402,7 +414,7 @@ INSERT INTO audit_log VALUES (
 );
 ```
 
-## ⚡ 性能优化
+## 性能优化
 
 ### 1. 避免在WHERE子句中解密
 
@@ -453,7 +465,7 @@ FROM user_info
 WHERE dt = '2024-12-24';
 ```
 
-## 🧪 测试验证
+## 测试验证
 
 ### 单元测试
 
@@ -506,13 +518,14 @@ FROM (
 ```
 
 运行测试:
+
 ```bash
 hive -f test_sm4_udf.hql
 ```
 
-## 📁 项目结构
+## 项目结构
 
-```
+```text
 sm4_java/
 ├── pom.xml                                 # Maven配置文件
 ├── README.md                               # 项目文档（本文件）
@@ -537,11 +550,12 @@ sm4_java/
     └── vastbase-sm4-hive-udf-1.0.0.jar    # 打包后的JAR文件
 ```
 
-## 🔧 常见问题
+## 常见问题
 
 ### Q1: 编译失败 - 找不到Hadoop/Hive类
 
-**A**: 确保Maven配置了正确的仓库，或者使用华为云镜像：
+**A**: 确保Maven配置了正确的仓库,或者使用华为云镜像：
+
 ```bash
 # 如果编译失败，尝试清理并重新下载依赖
 mvn clean
@@ -551,7 +565,8 @@ mvn package
 
 ### Q2: Hive中注册函数失败
 
-**A**: 检查以下几点：
+**A**: 检查以下几点:
+
 1. JAR包路径是否正确
 2. Hive版本是否兼容（建议3.1.3+）
 3. 类名是否完整（包含包名）
@@ -567,7 +582,8 @@ ADD JAR /path/to/new.jar;
 
 ### Q3: 解密结果为乱码
 
-**A**: 可能原因：
+**A**: 可能原因:
+
 1. 密钥不一致
 2. 加密模式不匹配（ECB vs CBC）
 3. 字符编码问题
@@ -583,7 +599,8 @@ FROM test_table;
 
 ### Q4: 性能问题
 
-**A**: 优化建议：
+**A**: 优化建议:
+
 1. 避免在WHERE条件中解密
 2. 使用分区表
 3. 批量处理而非逐行处理
@@ -601,13 +618,13 @@ DROP FUNCTION IF EXISTS sm4_encrypt_ecb;
 DROP FUNCTION IF EXISTS sm4_decrypt_ecb;
 ```
 
-## 📞 技术支持
+## 技术支持
 
 - **问题反馈**: 提交Issue到项目仓库
 - **文档**: 查看本README或源码注释
 - **兼容性**: 与VastBase数据库SM4扩展完全兼容
 
-## 📄 许可证
+## 许可证
 
 本项目遵循与VastBase SM4扩展相同的许可证。
 
