@@ -33,6 +33,10 @@ make
 # 安装
 make install
 
+# 复制.so到proc_srclib目录
+mkdir -p /home/vastbase/vasthome/lib/postgresql/proc_srclib
+cp /home/vastbase/vasthome/lib/postgresql/sm4.so /home/vastbase/vasthome/lib/postgresql/proc_srclib/
+
 # 重启数据库加载新扩展
 vb_ctl restart
 ```
@@ -54,22 +58,22 @@ vsql -d postgres
 
 -- 创建SM4函数
 CREATE OR REPLACE FUNCTION sm4_encrypt(plaintext text, key text)
-RETURNS bytea AS '$libdir/sm4', 'sm4_encrypt' LANGUAGE C STRICT IMMUTABLE;
+RETURNS bytea AS 'sm4', 'sm4_encrypt' LANGUAGE C STRICT IMMUTABLE;
 
 CREATE OR REPLACE FUNCTION sm4_decrypt(ciphertext bytea, key text)
-RETURNS text AS '$libdir/sm4', 'sm4_decrypt' LANGUAGE C STRICT IMMUTABLE;
+RETURNS text AS 'sm4', 'sm4_decrypt' LANGUAGE C STRICT IMMUTABLE;
 
 CREATE OR REPLACE FUNCTION sm4_encrypt_hex(plaintext text, key text)
-RETURNS text AS '$libdir/sm4', 'sm4_encrypt_hex' LANGUAGE C STRICT IMMUTABLE;
+RETURNS text AS 'sm4', 'sm4_encrypt_hex' LANGUAGE C STRICT IMMUTABLE;
 
 CREATE OR REPLACE FUNCTION sm4_decrypt_hex(ciphertext_hex text, key text)
-RETURNS text AS '$libdir/sm4', 'sm4_decrypt_hex' LANGUAGE C STRICT IMMUTABLE;
+RETURNS text AS 'sm4', 'sm4_decrypt_hex' LANGUAGE C STRICT IMMUTABLE;
 
 CREATE OR REPLACE FUNCTION sm4_encrypt_cbc(plaintext text, key text, iv text)
-RETURNS bytea AS '$libdir/sm4', 'sm4_encrypt_cbc' LANGUAGE C STRICT IMMUTABLE;
+RETURNS bytea AS 'sm4', 'sm4_encrypt_cbc' LANGUAGE C STRICT IMMUTABLE;
 
 CREATE OR REPLACE FUNCTION sm4_decrypt_cbc(ciphertext bytea, key text, iv text)
-RETURNS text AS '$libdir/sm4', 'sm4_decrypt_cbc' LANGUAGE C STRICT IMMUTABLE;
+RETURNS text AS 'sm4', 'sm4_decrypt_cbc' LANGUAGE C STRICT IMMUTABLE;
 
 -- 删除函数
 DROP FUNCTION IF EXISTS sm4_encrypt(text, text);
