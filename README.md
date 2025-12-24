@@ -19,7 +19,7 @@
 
 ```bash
 # 进入代码目录
-cd /path/to/vastbase_sm4
+cd /home/vastbase/vastbase_sm4
 
 # 设置环境变量
 export VBHOME=/home/vastbase/vasthome
@@ -31,13 +31,7 @@ make clean
 make
 
 # 安装
-cp sm4.so $VBHOME/lib/postgresql/
-cp sm4.control $VBHOME/share/postgresql/extension/
-cp sm4--1.0.sql $VBHOME/share/postgresql/extension/
-
-# 或使用安装脚本
-chmod +x install.sh
-./install.sh
+make install
 ```
 
 ## 启用扩展
