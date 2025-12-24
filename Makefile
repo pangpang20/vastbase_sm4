@@ -28,6 +28,10 @@ MODULE_big = sm4
 
 include $(PGXS)
 
+# PGXS之后强制覆盖链接器
+override CXX = gcc
+override CXXLD = gcc
+
 # 自定义编译规则
 sm4.o: sm4.c sm4.h
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(PG_CPPFLAGS) -fPIC -c -o $@ $<
@@ -38,3 +42,7 @@ sm4_ext.o: sm4_ext.c sm4.h
 # 清理
 clean-local:
 	rm -f *.o *.so
+
+# 自定义链接规则 (强制使用gcc)
+sm4.so: $(OBJS)
+	$(CC) -shared -o $@ $(OBJS) $(LDFLAGS) $(SHLIB_LINK)
