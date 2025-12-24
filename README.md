@@ -32,6 +32,9 @@ make
 
 # 安装
 make install
+
+# 重启数据库加载新扩展
+vb_ctl restart
 ```
 
 ## 启用扩展

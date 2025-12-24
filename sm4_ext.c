@@ -13,6 +13,8 @@
 
 PG_MODULE_MAGIC;
 
+extern "C" {
+
 /* 函数声明 */
 PG_FUNCTION_INFO_V1(sm4_encrypt);
 PG_FUNCTION_INFO_V1(sm4_decrypt);
@@ -443,3 +445,5 @@ sm4_decrypt_hex(PG_FUNCTION_ARGS)
 
     PG_RETURN_TEXT_P(result);
 }
+
+} /* extern "C" */

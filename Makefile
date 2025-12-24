@@ -27,12 +27,12 @@ MODULE_big = sm4
 
 include $(PGXS)
 
-# 自定义编译规则
+# 自定义编译规则 (使用g++编译.c文件)
 sm4.o: sm4.c sm4.h
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(PG_CPPFLAGS) -fPIC -c -o $@ $<
 
 sm4_ext.o: sm4_ext.c sm4.h
-	$(CC) $(CFLAGS) $(CPPFLAGS) $(PG_CPPFLAGS) -fPIC -c -o $@ $<
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) $(PG_CPPFLAGS) -fPIC -c -o $@ $<
 
 # 清理
 clean-local:
