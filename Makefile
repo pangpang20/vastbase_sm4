@@ -15,10 +15,11 @@ PG_CONFIG = $(VBHOME)/bin/pg_config
 # 获取PostgreSQL构建配置
 PGXS := $(shell $(PG_CONFIG) --pgxs)
 
-# 编译选项
+# 编译选项 (强制使用gcc)
 CC = gcc
-CXX = g++
-override CXXFLAGS := $(filter-out -std=c++14,$(CXXFLAGS)) -std=c++11
+CXX = gcc
+LD = gcc
+override CXXFLAGS := $(filter-out -std=c++14 -std=c++11,$(CXXFLAGS))
 PG_CPPFLAGS = -I$(VBHOME)/include/postgresql/server
 SHLIB_LINK =
 
@@ -27,12 +28,12 @@ MODULE_big = sm4
 
 include $(PGXS)
 
-# 自定义编译规则 (使用g++编译.c文件)
+# 自定义编译规则
 sm4.o: sm4.c sm4.h
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(PG_CPPFLAGS) -fPIC -c -o $@ $<
 
 sm4_ext.o: sm4_ext.c sm4.h
-	$(CXX) $(CXXFLAGS) $(CPPFLAGS) $(PG_CPPFLAGS) -fPIC -c -o $@ $<
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(PG_CPPFLAGS) -fPIC -c -o $@ $<
 
 # 清理
 clean-local:
