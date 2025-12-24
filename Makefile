@@ -1,48 +1,47 @@
 # SM4 Extension Makefile for VastBase/OpenGauss
-# 用法: make && make install
+# 独立编译，不依赖PGXS
 
-MODULES = sm4_ext
-EXTENSION = sm4
-DATA = sm4--1.0.sql
-OBJS = sm4.o sm4_ext.o
-
-# VastBase/OpenGauss 安装路径
+# VastBase安装路径
 VBHOME ?= /home/vastbase/vasthome
 
-# pg_config 路径
-PG_CONFIG = $(VBHOME)/bin/pg_config
-
-# 获取PostgreSQL构建配置
-PGXS := $(shell $(PG_CONFIG) --pgxs)
-
-# 编译选项 (强制使用gcc)
+# 编译器
 CC = gcc
-CXX = gcc
-LD = gcc
-override CXXFLAGS := $(filter-out -std=c++14 -std=c++11,$(CXXFLAGS))
-PG_CPPFLAGS = -I$(VBHOME)/include/postgresql/server
-SHLIB_LINK =
+CFLAGS = -O2 -Wall -fPIC
 
-# 目标库名
-MODULE_big = sm4
+# 包含路径
+INCLUDES = -I$(VBHOME)/include/postgresql/server \
+           -I$(VBHOME)/include/postgresql/internal \
+           -I$(VBHOME)/include
 
-include $(PGXS)
+# 目标文件
+OBJS = sm4.o sm4_ext.o
+TARGET = sm4.so
 
-# PGXS之后强制覆盖链接器
-override CXX = gcc
-override CXXLD = gcc
+# 安装路径
+LIBDIR = $(VBHOME)/lib/postgresql
+EXTDIR = $(VBHOME)/share/postgresql/extension
 
-# 自定义编译规则
+.PHONY: all clean install
+
+all: $(TARGET)
+
+$(TARGET): $(OBJS)
+	$(CC) -shared -o $@ $(OBJS)
+
 sm4.o: sm4.c sm4.h
-	$(CC) $(CFLAGS) $(CPPFLAGS) $(PG_CPPFLAGS) -fPIC -c -o $@ $<
+	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
 
 sm4_ext.o: sm4_ext.c sm4.h
-	$(CC) $(CFLAGS) $(CPPFLAGS) $(PG_CPPFLAGS) -fPIC -c -o $@ $<
+	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
 
-# 清理
-clean-local:
-	rm -f *.o *.so
+install: $(TARGET)
+	cp $(TARGET) $(LIBDIR)/
+	cp sm4.control $(EXTDIR)/
+	cp sm4--1.0.sql $(EXTDIR)/
+	@echo "安装完成!"
+	@echo "  $(LIBDIR)/$(TARGET)"
+	@echo "  $(EXTDIR)/sm4.control"
+	@echo "  $(EXTDIR)/sm4--1.0.sql"
 
-# 自定义链接规则 (强制使用gcc)
-sm4.so: $(OBJS)
-	$(CC) -shared -o $@ $(OBJS) $(LDFLAGS) $(SHLIB_LINK)
+clean:
+	rm -f $(OBJS) $(TARGET)
