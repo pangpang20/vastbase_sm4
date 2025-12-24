@@ -84,7 +84,7 @@ static int get_key_bytes(text *key_text, uint8_t *key_bytes)
  * sm4_encrypt(plaintext text, key text) -> bytea
  * ECB模式加密，返回二进制数据
  */
-Datum
+extern "C" Datum
 sm4_encrypt(PG_FUNCTION_ARGS)
 {
     text *plaintext = PG_GETARG_TEXT_PP(0);
@@ -135,7 +135,7 @@ sm4_encrypt(PG_FUNCTION_ARGS)
  * sm4_decrypt(ciphertext bytea, key text) -> text
  * ECB模式解密
  */
-Datum
+extern "C" Datum
 sm4_decrypt(PG_FUNCTION_ARGS)
 {
     bytea *ciphertext = PG_GETARG_BYTEA_PP(0);
@@ -182,7 +182,7 @@ sm4_decrypt(PG_FUNCTION_ARGS)
  * sm4_encrypt_cbc(plaintext text, key text, iv text) -> bytea
  * CBC模式加密
  */
-Datum
+extern "C" Datum
 sm4_encrypt_cbc(PG_FUNCTION_ARGS)
 {
     text *plaintext = PG_GETARG_TEXT_PP(0);
@@ -258,7 +258,7 @@ sm4_encrypt_cbc(PG_FUNCTION_ARGS)
  * sm4_decrypt_cbc(ciphertext bytea, key text, iv text) -> text
  * CBC模式解密
  */
-Datum
+extern "C" Datum
 sm4_decrypt_cbc(PG_FUNCTION_ARGS)
 {
     bytea *ciphertext = PG_GETARG_BYTEA_PP(0);
@@ -330,7 +330,7 @@ sm4_decrypt_cbc(PG_FUNCTION_ARGS)
  * sm4_encrypt_hex(plaintext text, key text) -> text
  * ECB模式加密，返回十六进制字符串
  */
-Datum
+extern "C" Datum
 sm4_encrypt_hex(PG_FUNCTION_ARGS)
 {
     text *plaintext = PG_GETARG_TEXT_PP(0);
@@ -384,7 +384,7 @@ sm4_encrypt_hex(PG_FUNCTION_ARGS)
  * sm4_decrypt_hex(ciphertext_hex text, key text) -> text
  * ECB模式解密，输入为十六进制字符串
  */
-Datum
+extern "C" Datum
 sm4_decrypt_hex(PG_FUNCTION_ARGS)
 {
     text *ciphertext_hex = PG_GETARG_TEXT_PP(0);
