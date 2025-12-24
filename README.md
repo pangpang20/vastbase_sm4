@@ -43,14 +43,22 @@ vb_ctl restart
 
 ## 启用扩展
 
-VastBase不支持EXTENSION语法，需直接执行SQL创建函数：
+VastBase不支持EXTENSION语法，需直接执行SQL创建函数。
+
+**注意**: 函数是数据库级别对象，需在每个要使用的数据库中单独创建。.so文件是共享的，只需安装一次。
 
 ```bash
-# 连接数据库并执行SQL文件
+# 在postgres库中创建函数
 vsql -d postgres -f /home/vastbase/vasthome/share/postgresql/extension/sm4--1.0.sql
+
+# 在vastbase库中创建函数
+vsql -d vastbase -f /home/vastbase/vasthome/share/postgresql/extension/sm4--1.0.sql
+
+# 在其他库中创建...
+vsql -d mydb -f /home/vastbase/vasthome/share/postgresql/extension/sm4--1.0.sql
 ```
 
-或手动执行：
+或手动执行（可选）：
 
 ```sql
 -- 连接数据库
