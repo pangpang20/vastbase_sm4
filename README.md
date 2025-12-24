@@ -340,7 +340,7 @@ SELECT sm4_decrypt_ecb('base64_of_a1b2c3d4e5f6...', 'mykey1234567890');
 - JDK 17+
 - Maven 3.6+
 - Hive 3.1.3+
-- Hadoop 3.3.4+
+- **Hadoop**: 3.1.3+
 
 ---
 
@@ -371,6 +371,6 @@ SELECT sm4_decrypt_ecb('base64_of_a1b2c3d4e5f6...', 'mykey1234567890');
 
 ---
 
-**最后更新**: 2024-12-24  
+**最后更新**: 2025-12-24  
 **版本**: 1.0.0  
-**维护者**: VastBase SM4 Team
+**维护者**: 陈云亮 <676814828@qq.com>

@@ -1,10 +1,10 @@
-# SM4 Extension for VastBase/OpenGauss
+# SM4 Extension for VastBase
 
 国密SM4分组密码算法扩展，基于GB/T 32907-2016标准实现。
 
 ## 文件结构
 
-```
+```bash
 ├── sm4.h               # SM4算法头文件
 ├── sm4.c               # SM4算法实现
 ├── sm4_ext.c           # VastBase扩展接口

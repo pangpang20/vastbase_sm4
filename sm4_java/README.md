@@ -1,4 +1,4 @@
-# VastBase SM4 Hive UDF
+# VastBase2MRS SM4 Hive UDF
 
 基于Java 17的SM4国密加解密Hive UDF函数，支持ECB和CBC两种加密模式，与VastBase数据库SM4扩展完全兼容。
 
@@ -18,7 +18,7 @@
 - **JDK**: 17+
 - **Maven**: 3.6+
 - **Hive**: 3.1.3+
-- **Hadoop**: 3.3.4+
+- **Hadoop**: 3.1.3+
 
 ### 2. 编译打包
 
@@ -520,7 +520,7 @@ sm4_java/
 │   ├── main/
 │   │   └── java/
 │   │       └── com/
-│   │           └── vastbase/
+│   │           └── audaque/
 │   │               └── hiveudf/
 │   │                   ├── SM4Utils.java          # SM4加解密工具类
 │   │                   ├── SM4EncryptECB.java     # ECB加密UDF
@@ -530,7 +530,7 @@ sm4_java/
 │   └── test/
 │       └── java/
 │           └── com/
-│               └── vastbase/
+│               └── audaque/
 │                   └── hiveudf/
 │                       └── SM4UtilsTest.java      # 单元测试
 └── target/
@@ -613,6 +613,6 @@ DROP FUNCTION IF EXISTS sm4_decrypt_ecb;
 
 ---
 
-**最后更新**: 2024-12-24  
+**最后更新**: 2025-12-24  
 **版本**: 1.0.0  
-**作者**: VastBase SM4 Team
+**作者**: 陈云亮 <676814828@qq.com>
