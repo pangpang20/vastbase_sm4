@@ -1,4 +1,4 @@
-# VastBase SM4 国密加密解决方案
+# VastBase2MRS SM4 国密加密解决方案
 
 本项目提供了VastBase数据库和Hive的SM4国密加解密完整解决方案，包含C语言数据库扩展和Java Hive UDF两个实现。
 
