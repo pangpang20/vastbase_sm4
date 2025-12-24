@@ -9,7 +9,7 @@
     <version>1.0.0</version>
     <packaging>jar</packaging>
 
-    <name>VastBase SM4 Hive UDF</name>
+    <name>VastBase2MRS SM4 Hive UDF</name>
     <description>
         VastBase数据库SM4加解密Hive UDF函数
         支持ECB和CBC模式，与VastBase SM4扩展完全兼容

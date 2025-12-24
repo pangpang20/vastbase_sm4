@@ -1,5 +1,5 @@
 -- ========================================
--- VastBase SM4 Hive UDF 测试脚本
+-- VastBase2MRS SM4 Hive UDF 测试脚本
 -- ========================================
 -- 使用方法: hive -f test_sm4_udf.hql
 -- 或在hive命令行中: source test_sm4_udf.hql
