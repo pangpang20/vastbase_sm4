@@ -256,4 +256,4 @@ vsql -d test01 -f demo_citizen_data.sql
 ![alt text](image.png)
 
 测试结果3：
-
+![alt text](image-1.png)
