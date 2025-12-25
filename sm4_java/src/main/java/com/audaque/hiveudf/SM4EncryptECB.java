@@ -20,11 +20,11 @@ import org.apache.hadoop.io.Text;
  * 返回: Base64编码的密文字符串
  * 
  * 示例:
- * SELECT sm4_encrypt_ecb('13800138001', 'mykey1234567890') AS encrypted_phone;
+ * SELECT sm4_encrypt_ecb('13800138001', 'mykey12345678901') AS encrypted_phone;
  * 
  * @author VastBase SM4 Team
  */
-@Description(name = "sm4_encrypt_ecb", value = "_FUNC_(plaintext, key) - SM4 ECB mode encryption, returns Base64 encoded ciphertext", extended = "Example: SELECT sm4_encrypt_ecb('13800138001', 'mykey1234567890');")
+@Description(name = "sm4_encrypt_ecb", value = "_FUNC_(plaintext, key) - SM4 ECB mode encryption, returns Base64 encoded ciphertext", extended = "Example: SELECT sm4_encrypt_ecb('13800138001', 'mykey12345678901');")
 public class SM4EncryptECB extends GenericUDF {
 
     private PrimitiveObjectInspector plaintextInspector;

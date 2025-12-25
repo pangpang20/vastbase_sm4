@@ -112,20 +112,20 @@ sm4_encrypt_ecb(plaintext STRING, key STRING) RETURNS STRING
 
 ```sql
 -- 基本加密
-SELECT sm4_encrypt_ecb('13800138001', 'mykey1234567890') AS encrypted_phone;
+SELECT sm4_encrypt_ecb('13800138001', 'mykey12345678901') AS encrypted_phone;
 
 -- 批量加密用户手机号
 SELECT 
     user_id,
     name,
-    sm4_encrypt_ecb(phone, 'mykey1234567890') AS encrypted_phone
+    sm4_encrypt_ecb(phone, 'mykey12345678901') AS encrypted_phone
 FROM user_table;
 
 -- 加密身份证号
 SELECT 
     citizen_id,
     name,
-    sm4_encrypt_ecb(id_card, 'gov2024secret123') AS encrypted_id_card
+    sm4_encrypt_ecb(id_card, 'gov2024secret12') AS encrypted_id_card
 FROM citizen_info;
 ```
 
@@ -148,19 +148,19 @@ sm4_decrypt_ecb(ciphertext STRING, key STRING) RETURNS STRING
 
 ```sql
 -- 基本解密
-SELECT sm4_decrypt_ecb('base64_encrypted_data', 'mykey1234567890') AS phone;
+SELECT sm4_decrypt_ecb('base64_encrypted_data', 'mykey12345678901') AS phone;
 
 -- 解密查询
 SELECT 
     user_id,
     name,
-    sm4_decrypt_ecb(encrypted_phone, 'mykey1234567890') AS phone
+    sm4_decrypt_ecb(encrypted_phone, 'mykey12345678901') AS phone
 FROM user_table_encrypted;
 
 -- 条件查询（解密后匹配）
 SELECT *
 FROM user_table_encrypted
-WHERE sm4_decrypt_ecb(encrypted_phone, 'mykey1234567890') = '13800138001';
+WHERE sm4_decrypt_ecb(encrypted_phone, 'mykey12345678901') = '13800138001';
 ```
 
 ### 3. sm4_encrypt_cbc - CBC模式加密
@@ -185,7 +185,7 @@ sm4_encrypt_cbc(plaintext STRING, key STRING, iv STRING) RETURNS STRING
 -- CBC模式加密
 SELECT sm4_encrypt_cbc(
     'sensitive data', 
-    'mykey1234567890', 
+    'mykey12345678901', 
     '1234567890abcdef'
 ) AS encrypted_data;
 ```
@@ -204,7 +204,7 @@ sm4_decrypt_cbc(ciphertext STRING, key STRING, iv STRING) RETURNS STRING
 -- CBC模式解密
 SELECT sm4_decrypt_cbc(
     encrypted_data, 
-    'mykey1234567890', 
+    'mykey12345678901', 
     '1234567890abcdef'
 ) AS original_data
 FROM encrypted_table;
@@ -246,8 +246,8 @@ INSERT INTO user_info_encrypted
 SELECT 
     user_id,
     name,
-    sm4_encrypt_ecb(phone, 'mykey1234567890') AS phone_encrypted,
-    sm4_encrypt_ecb(id_card, 'mykey1234567890') AS id_card_encrypted,
+    sm4_encrypt_ecb(phone, 'mykey12345678901') AS phone_encrypted,
+    sm4_encrypt_ecb(id_card, 'mykey12345678901') AS id_card_encrypted,
     email,
     created_at
 FROM user_info;
@@ -260,8 +260,8 @@ FROM user_info;
 SELECT 
     user_id,
     name,
-    sm4_decrypt_ecb(phone_encrypted, 'mykey1234567890') AS phone,
-    sm4_decrypt_ecb(id_card_encrypted, 'mykey1234567890') AS id_card,
+    sm4_decrypt_ecb(phone_encrypted, 'mykey12345678901') AS phone,
+    sm4_decrypt_ecb(id_card_encrypted, 'mykey12345678901') AS id_card,
     email
 FROM user_info_encrypted;
 
@@ -270,9 +270,9 @@ SELECT
     user_id,
     name,
     CONCAT(
-        SUBSTR(sm4_decrypt_ecb(phone_encrypted, 'mykey1234567890'), 1, 3),
+        SUBSTR(sm4_decrypt_ecb(phone_encrypted, 'mykey12345678901'), 1, 3),
         '****',
-        SUBSTR(sm4_decrypt_ecb(phone_encrypted, 'mykey1234567890'), 8, 4)
+        SUBSTR(sm4_decrypt_ecb(phone_encrypted, 'mykey12345678901'), 8, 4)
     ) AS phone_masked,
     email
 FROM user_info_encrypted;

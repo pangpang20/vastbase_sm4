@@ -20,12 +20,12 @@ import org.apache.hadoop.io.Text;
  * 返回: 解密后的明文字符串
  * 
  * 示例:
- * SELECT sm4_decrypt_ecb(encrypted_phone, 'mykey1234567890') AS phone FROM
+ * SELECT sm4_decrypt_ecb(encrypted_phone, 'mykey12345678901') AS phone FROM
  * user_table;
  * 
  * @author VastBase SM4 Team
  */
-@Description(name = "sm4_decrypt_ecb", value = "_FUNC_(ciphertext, key) - SM4 ECB mode decryption, input is Base64 encoded ciphertext", extended = "Example: SELECT sm4_decrypt_ecb(encrypted_data, 'mykey1234567890');")
+@Description(name = "sm4_decrypt_ecb", value = "_FUNC_(ciphertext, key) - SM4 ECB mode decryption, input is Base64 encoded ciphertext", extended = "Example: SELECT sm4_decrypt_ecb(encrypted_data, 'mykey12345678901');")
 public class SM4DecryptECB extends GenericUDF {
 
     private PrimitiveObjectInspector ciphertextInspector;

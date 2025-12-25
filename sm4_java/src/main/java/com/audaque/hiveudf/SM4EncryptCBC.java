@@ -22,7 +22,7 @@ import org.apache.hadoop.io.Text;
  * 
  * @author VastBase SM4 Team
  */
-@Description(name = "sm4_encrypt_cbc", value = "_FUNC_(plaintext, key, iv) - SM4 CBC mode encryption", extended = "Example: SELECT sm4_encrypt_cbc('sensitive data', 'mykey1234567890', '1234567890abcdef');")
+@Description(name = "sm4_encrypt_cbc", value = "_FUNC_(plaintext, key, iv) - SM4 CBC mode encryption", extended = "Example: SELECT sm4_encrypt_cbc('sensitive data', 'mykey12345678901', '1234567890abcdef');")
 public class SM4EncryptCBC extends GenericUDF {
 
     private PrimitiveObjectInspector plaintextInspector;

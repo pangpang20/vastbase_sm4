@@ -17,7 +17,7 @@ import org.apache.hadoop.io.Text;
  * 
  * @author VastBase SM4 Team
  */
-@Description(name = "sm4_decrypt_cbc", value = "_FUNC_(ciphertext, key, iv) - SM4 CBC mode decryption", extended = "Example: SELECT sm4_decrypt_cbc(encrypted_data, 'mykey1234567890', '1234567890abcdef');")
+@Description(name = "sm4_decrypt_cbc", value = "_FUNC_(ciphertext, key, iv) - SM4 CBC mode decryption", extended = "Example: SELECT sm4_decrypt_cbc(encrypted_data, 'mykey12345678901', '1234567890abcdef');")
 public class SM4DecryptCBC extends GenericUDF {
 
     private PrimitiveObjectInspector ciphertextInspector;

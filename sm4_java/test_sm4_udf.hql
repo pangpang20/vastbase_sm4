@@ -31,15 +31,15 @@ SELECT
 UNION ALL
 SELECT 
     '密钥',
-    'mykey1234567890'
+    'mykey12345678901'
 UNION ALL
 SELECT 
     '密文(Base64)',
-    sm4_encrypt_ecb('Hello Hive!', 'mykey1234567890')
+    sm4_encrypt_ecb('Hello Hive!', 'mykey12345678901')
 UNION ALL
 SELECT 
     '解密结果',
-    sm4_decrypt_ecb(sm4_encrypt_ecb('Hello Hive!', 'mykey1234567890'), 'mykey1234567890');
+    sm4_decrypt_ecb(sm4_encrypt_ecb('Hello Hive!', 'mykey12345678901'), 'mykey12345678901');
 
 -- 5. 测试中文加密
 SELECT '' AS blank_line;
@@ -49,8 +49,8 @@ SELECT '========================================' AS divider;
 
 SELECT 
     '测试中文加密' AS original,
-    sm4_encrypt_ecb('测试中文加密', 'mykey1234567890') AS encrypted,
-    sm4_decrypt_ecb(sm4_encrypt_ecb('测试中文加密', 'mykey1234567890'), 'mykey1234567890') AS decrypted;
+    sm4_encrypt_ecb('测试中文加密', 'mykey12345678901') AS encrypted,
+    sm4_decrypt_ecb(sm4_encrypt_ecb('测试中文加密', 'mykey12345678901'), 'mykey12345678901') AS decrypted;
 
 -- 6. 测试手机号加密
 SELECT '' AS blank_line;
@@ -60,8 +60,8 @@ SELECT '========================================' AS divider;
 
 SELECT 
     '13800138001' AS original_phone,
-    sm4_encrypt_ecb('13800138001', 'mykey1234567890') AS encrypted_phone,
-    sm4_decrypt_ecb(sm4_encrypt_ecb('13800138001', 'mykey1234567890'), 'mykey1234567890') AS decrypted_phone;
+    sm4_encrypt_ecb('13800138001', 'mykey12345678901') AS encrypted_phone,
+    sm4_decrypt_ecb(sm4_encrypt_ecb('13800138001', 'mykey12345678901'), 'mykey12345678901') AS decrypted_phone;
 
 -- 7. 测试身份证号加密
 SELECT '' AS blank_line;
@@ -71,8 +71,8 @@ SELECT '========================================' AS divider;
 
 SELECT 
     '110101198503151234' AS original_id,
-    sm4_encrypt_ecb('110101198503151234', 'mykey1234567890') AS encrypted_id,
-    sm4_decrypt_ecb(sm4_encrypt_ecb('110101198503151234', 'mykey1234567890'), 'mykey1234567890') AS decrypted_id;
+    sm4_encrypt_ecb('110101198503151234', 'mykey12345678901') AS encrypted_id,
+    sm4_decrypt_ecb(sm4_encrypt_ecb('110101198503151234', 'mykey12345678901'), 'mykey12345678901') AS decrypted_id;
 
 -- 8. 测试CBC模式
 SELECT '' AS blank_line;
@@ -82,10 +82,10 @@ SELECT '========================================' AS divider;
 
 SELECT 
     'CBC模式测试数据' AS original,
-    sm4_encrypt_cbc('CBC模式测试数据', 'mykey1234567890', '1234567890abcdef') AS encrypted,
+    sm4_encrypt_cbc('CBC模式测试数据', 'mykey12345678901', '1234567890abcdef') AS encrypted,
     sm4_decrypt_cbc(
-        sm4_encrypt_cbc('CBC模式测试数据', 'mykey1234567890', '1234567890abcdef'),
-        'mykey1234567890',
+        sm4_encrypt_cbc('CBC模式测试数据', 'mykey12345678901', '1234567890abcdef'),
+        'mykey12345678901',
         '1234567890abcdef'
     ) AS decrypted;
 
@@ -99,9 +99,9 @@ SELECT
     sm4_decrypt_ecb(
         sm4_encrypt_ecb(
             '这是一段较长的测试文本，用于验证SM4加密算法对多个数据块的处理能力。SM4是中国国家密码管理局发布的分组密码标准，具有高安全性和良好的性能。',
-            'mykey1234567890'
+            'mykey12345678901'
         ),
-        'mykey1234567890'
+        'mykey12345678901'
     ) AS long_text_result;
 
 -- 10. 测试空值处理
@@ -112,8 +112,8 @@ SELECT '========================================' AS divider;
 
 SELECT 
     'Empty String' AS test_case,
-    sm4_encrypt_ecb('', 'mykey1234567890') AS encrypted,
-    LENGTH(sm4_encrypt_ecb('', 'mykey1234567890')) AS encrypted_length;
+    sm4_encrypt_ecb('', 'mykey12345678901') AS encrypted,
+    LENGTH(sm4_encrypt_ecb('', 'mykey12345678901')) AS encrypted_length;
 
 -- 11. 创建测试表
 SELECT '' AS blank_line;
@@ -155,8 +155,8 @@ INSERT INTO sm4_test_table_encrypted
 SELECT 
     id,
     name,
-    sm4_encrypt_ecb(phone, 'mykey1234567890') AS phone_encrypted,
-    sm4_encrypt_ecb(id_card, 'mykey1234567890') AS id_card_encrypted
+    sm4_encrypt_ecb(phone, 'mykey12345678901') AS phone_encrypted,
+    sm4_encrypt_ecb(id_card, 'mykey12345678901') AS id_card_encrypted
 FROM sm4_test_table;
 
 SELECT 'Encrypted data inserted' AS status;
@@ -184,8 +184,8 @@ SELECT '========================================' AS divider;
 SELECT 
     id,
     name,
-    sm4_decrypt_ecb(phone_encrypted, 'mykey1234567890') AS phone,
-    sm4_decrypt_ecb(id_card_encrypted, 'mykey1234567890') AS id_card
+    sm4_decrypt_ecb(phone_encrypted, 'mykey12345678901') AS phone,
+    sm4_decrypt_ecb(id_card_encrypted, 'mykey12345678901') AS id_card
 FROM sm4_test_table_encrypted
 LIMIT 3;
 
@@ -199,14 +199,14 @@ SELECT
     id,
     name,
     CONCAT(
-        SUBSTR(sm4_decrypt_ecb(phone_encrypted, 'mykey1234567890'), 1, 3),
+        SUBSTR(sm4_decrypt_ecb(phone_encrypted, 'mykey12345678901'), 1, 3),
         '****',
-        SUBSTR(sm4_decrypt_ecb(phone_encrypted, 'mykey1234567890'), 8, 4)
+        SUBSTR(sm4_decrypt_ecb(phone_encrypted, 'mykey12345678901'), 8, 4)
     ) AS phone_masked,
     CONCAT(
-        SUBSTR(sm4_decrypt_ecb(id_card_encrypted, 'mykey1234567890'), 1, 6),
+        SUBSTR(sm4_decrypt_ecb(id_card_encrypted, 'mykey12345678901'), 1, 6),
         '********',
-        SUBSTR(sm4_decrypt_ecb(id_card_encrypted, 'mykey1234567890'), 15, 4)
+        SUBSTR(sm4_decrypt_ecb(id_card_encrypted, 'mykey12345678901'), 15, 4)
     ) AS id_card_masked
 FROM sm4_test_table_encrypted
 LIMIT 5;
@@ -220,9 +220,9 @@ SELECT '========================================' AS divider;
 SELECT 
     id,
     name,
-    sm4_decrypt_ecb(phone_encrypted, 'mykey1234567890') AS phone
+    sm4_decrypt_ecb(phone_encrypted, 'mykey12345678901') AS phone
 FROM sm4_test_table_encrypted
-WHERE sm4_decrypt_ecb(phone_encrypted, 'mykey1234567890') = '13800138003';
+WHERE sm4_decrypt_ecb(phone_encrypted, 'mykey12345678901') = '13800138003';
 
 -- 17. 一致性验证
 SELECT '' AS blank_line;
@@ -248,7 +248,7 @@ SELECT
     COUNT(*) AS total_encrypted,
     'Performance test completed' AS status
 FROM (
-    SELECT sm4_encrypt_ecb(CONCAT('data_', name), 'mykey1234567890') AS encrypted
+    SELECT sm4_encrypt_ecb(CONCAT('data_', name), 'mykey12345678901') AS encrypted
     FROM sm4_test_table
 ) t;
 

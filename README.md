@@ -60,13 +60,13 @@ sm4_c_decrypt_cbc(bytea, text, text) RETURNS text
 
 ```sql
 -- ECB模式加密
-SELECT sm4_c_encrypt_hex('13800138001', 'mykey1234567890') AS encrypted_phone;
+SELECT sm4_c_encrypt_hex('13800138001', 'mykey12345678901') AS encrypted_phone;
 
 -- ECB模式解密
-SELECT sm4_c_decrypt_hex('encrypted_hex_string', 'mykey1234567890') AS phone;
+SELECT sm4_c_decrypt_hex('encrypted_hex_string', 'mykey12345678901') AS phone;
 
 -- CBC模式加密（更安全）
-SELECT sm4_c_encrypt_cbc('sensitive data', 'mykey1234567890', '1234567890abcdef');
+SELECT sm4_c_encrypt_cbc('sensitive data', 'mykey12345678901', '1234567890abcdef');
 ```
 
 ### C扩展应用场景
@@ -217,7 +217,7 @@ export SM4_KEY="your_secret_key"
 
 支持两种密钥格式：
 
-- **16字节字符串**: `"mykey1234567890"` (推荐)
+- **16字节字符串**: `"mykey12345678901"` (推荐)
 - **32位十六进制**: `"6d796b657931323334353637383930"`
 
 ### 3. 加密模式选择
@@ -242,11 +242,11 @@ GRANT SELECT ON users_masked TO analyst_role;
 
 ```sql
 -- 在VastBase中加密（使用C扩展）
-SELECT sm4_c_encrypt_hex('test data', 'mykey1234567890') AS encrypted;
+SELECT sm4_c_encrypt_hex('test data', 'mykey12345678901') AS encrypted;
 -- 输出: a1b2c3d4e5f6...
 
 -- 在Hive中解密（转换为Base64）
-SELECT sm4_decrypt_ecb('base64_of_a1b2c3d4e5f6...', 'mykey1234567890');
+SELECT sm4_decrypt_ecb('base64_of_a1b2c3d4e5f6...', 'mykey12345678901');
 -- 输出: test data
 ```
 

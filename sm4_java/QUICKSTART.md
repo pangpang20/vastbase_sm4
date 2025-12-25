@@ -66,7 +66,7 @@ CREATE TEMPORARY FUNCTION sm4_encrypt_cbc AS 'com.audaque.hiveudf.SM4EncryptCBC'
 CREATE TEMPORARY FUNCTION sm4_decrypt_cbc AS 'com.audaque.hiveudf.SM4DecryptCBC';
 
 -- 测试
-SELECT sm4_encrypt_ecb('Hello Hive!', 'mykey1234567890');
+SELECT sm4_encrypt_ecb('Hello Hive!', 'mykey12345678901');
 ```
 
 #### 方法B: 永久函数（生产环境推荐）
@@ -98,8 +98,8 @@ DESC FUNCTION EXTENDED sm4_encrypt_ecb;
 -- 简单测试
 SELECT 
     sm4_decrypt_ecb(
-        sm4_encrypt_ecb('Test Data', 'mykey1234567890'),
-        'mykey1234567890'
+        sm4_encrypt_ecb('Test Data', 'mykey12345678901'),
+        'mykey12345678901'
     ) AS result;
 ```
 
@@ -172,13 +172,13 @@ FROM users_encrypted;
 ```sql
 -- CBC模式需要额外的IV参数
 SELECT 
-    sm4_encrypt_cbc('敏感数据', 'mykey1234567890', '1234567890abcdef') AS encrypted;
+    sm4_encrypt_cbc('敏感数据', 'mykey12345678901', '1234567890abcdef') AS encrypted;
 
 -- CBC模式解密
 SELECT 
     sm4_decrypt_cbc(
         encrypted_data, 
-        'mykey1234567890', 
+        'mykey12345678901', 
         '1234567890abcdef'
     ) AS decrypted
 FROM sensitive_table;
@@ -235,7 +235,7 @@ sm4_java/
 
 支持两种密钥格式：
 
-1. **16字节字符串**: `"mykey1234567890"` （16个字符）
+1. **16字节字符串**: `"mykey12345678901"` （16个字符）
 2. **32位十六进制**: `"6d796b657931323334353637383930"`
 
 ### 密钥管理建议
@@ -245,7 +245,7 @@ sm4_java/
 SELECT sm4_encrypt_ecb(phone, 'hardcoded_key') FROM users;
 
 --  推荐：使用Hive变量
-SET hivevar:sm4_key=mykey1234567890;
+SET hivevar:sm4_key=mykey12345678901;
 SELECT sm4_encrypt_ecb(phone, '${hivevar:sm4_key}') FROM users;
 
 --  最佳：从密钥管理系统获取（在应用层）
