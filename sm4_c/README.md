@@ -251,3 +251,9 @@ vsql -d test01 -f demo_citizen_data.sql
 
 测试结果1：
 ![alt text](image-2.png)
+
+测试结果2：
+![alt text](image.png)
+
+测试结果3：
+
