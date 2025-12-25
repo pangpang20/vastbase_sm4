@@ -261,7 +261,7 @@ ORDER BY citizen_count DESC;
 \echo '========================================'
 \echo '创建安全查询视图(自动脱敏)'
 \echo '========================================'
-DROP VIEW IF EXISTS citizen_info_masked;
+DROP VIEW IF EXISTS citizen_info_masked CASCADE;
 CREATE VIEW citizen_info_masked AS
 SELECT 
     citizen_id,
