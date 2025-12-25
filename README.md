@@ -14,8 +14,10 @@ vastbase_sm4/
 
 ## sm4_c - VastBase数据库扩展
 
-**技术栈**: C语言 + PostgreSQL扩展框架  
+**技术栈**: C语言 + PostgreSQL扩展框架
+
 **目标平台**: VastBase数据库
+
 **加密算法**: SM4国密算法（GB/T 32907-2016标准）
 
 ### 主要功能
