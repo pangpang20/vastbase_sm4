@@ -40,6 +40,8 @@ GCM (Galois/Counter Mode) 是一种认证加密模式，提供数据的保密性
 
 ### 加密函数
 
+**二进制版本（返回 bytea）**
+
 ```sql
 sm4_c_encrypt_gcm(
     plaintext text,      -- 明文
@@ -49,7 +51,20 @@ sm4_c_encrypt_gcm(
 ) RETURNS bytea          -- 返回: 密文 + 16字节认证标签
 ```
 
+**Base64版本（返回 text）**
+
+```sql
+sm4_c_encrypt_gcm_base64(
+    plaintext text,      -- 明文
+    key text,            -- 密钥 (16字节或32位十六进制)
+    iv text,             -- 初始向量 (12或16字节，或24/32位十六进制，推荐12字节)
+    aad text DEFAULT NULL -- 附加认证数据 (可选)
+) RETURNS text           -- 返回: Base64编码的密文 + 16字节认证标签
+```
+
 ### 解密函数
+
+**二进制版本（接收 bytea）**
 
 ```sql
 sm4_c_decrypt_gcm(
@@ -60,9 +75,22 @@ sm4_c_decrypt_gcm(
 ) RETURNS text                  -- 返回: 明文 (如果认证失败则报错)
 ```
 
+**Base64版本（接收 text）**
+
+```sql
+sm4_c_decrypt_gcm_base64(
+    ciphertext_base64 text,     -- Base64编码的密文+标签
+    key text,                   -- 密钥
+    iv text,                    -- 初始向量 (12或16字节，或24/32位十六进制，必须与加密时相同)
+    aad text DEFAULT NULL       -- 附加认证数据 (必须与加密时相同)
+) RETURNS text                  -- 返回: 明文 (如果认证失败则报错)
+```
+
 ## 使用示例
 
 ### 1. 基本加密解密（无 AAD）
+
+**二进制版本：**
 
 ```sql
 -- 加密
@@ -80,7 +108,30 @@ SELECT sm4_c_decrypt_gcm(
 );
 ```
 
+**Base64版本：**
+
+```sql
+-- 加密
+SELECT sm4_c_encrypt_gcm_base64(
+    'Hello World!',        -- 明文
+    '1234567890123456',    -- 密钥
+    '123456789012'         -- IV
+) AS encrypted_base64 \gset
+
+-- 结果例: l7KTjHKuvrP6cAY4J6FofBmzHej8IHeeiSOApA==
+
+-- 解密
+SELECT sm4_c_decrypt_gcm_base64(
+    :'encrypted_base64',   -- Base64密文
+    '1234567890123456',    -- 密钥
+    '123456789012'         -- IV
+);
+-- 返回: Hello World!
+```
+
 ### 2. 使用 AAD 的加密解密
+
+**二进制版本：**
 
 ```sql
 -- 加密（带 AAD）
@@ -94,6 +145,26 @@ SELECT sm4_c_encrypt_gcm(
 -- 解密（需要提供相同的 AAD）
 SELECT sm4_c_decrypt_gcm(
     :'encrypted_with_aad',
+    '1234567890123456',
+    '123456789012',
+    'user_id:12345'        -- AAD 必须与加密时一致
+);
+```
+
+**Base64版本：**
+
+```sql
+-- 加密（带 AAD）
+SELECT sm4_c_encrypt_gcm_base64(
+    'Secret Message',      -- 明文
+    '1234567890123456',    -- 密钥
+    '123456789012',        -- IV
+    'user_id:12345'        -- AAD
+) AS encrypted_base64_aad \gset
+
+-- 解密
+SELECT sm4_c_decrypt_gcm_base64(
+    :'encrypted_base64_aad',
     '1234567890123456',
     '123456789012',
     'user_id:12345'        -- AAD 必须与加密时一致
@@ -306,6 +377,73 @@ CREATE INDEX idx_encrypted ON users USING hash(encrypted_ssn);
 | 填充需求 | ✅ (PKCS7) | ✅ (PKCS7)      | ❌          |
 | 安全性   | 低        | 中             | 高         |
 | 推荐使用 | ❌         | 部分场景       | ✅          |
+
+## 输出格式选择
+
+项目提供了两种输出格式：
+
+### 1. 二进制版本 (bytea)
+
+**函数**：`sm4_c_encrypt_gcm` / `sm4_c_decrypt_gcm`
+
+**优点**：
+- ✅ 存储空间最小（原始二进制）
+- ✅ 数据库原生支持
+- ✅ 性能最优，无需编解码
+
+**适用场景**：
+- 数据直接存储在数据库中
+- 内部系统使用
+- 对存储空间敏感
+
+```sql
+-- 返回 bytea: \x97b2938c72aebeb3fa70063827a1687c19b31de8fc20779e892380a4
+SELECT sm4_c_encrypt_gcm('hello world!', 'key', 'iv');
+```
+
+### 2. Base64版本 (text)
+
+**函数**：`sm4_c_encrypt_gcm_base64` / `sm4_c_decrypt_gcm_base64`
+
+**优点**：
+- ✅ 易于传输（HTTP/JSON/XML）
+- ✅ 可读性更好
+- ✅ 无特殊字符，兼容性强
+- ✅ 与外部系统集成方便
+
+**缺点**：
+- ❌ 存储空间增加约 33%
+- ❌ 需要编解码开销
+
+**适用场景**：
+- API 接口返回
+- 前后端数据交换
+- 命令行工具输出
+- 与第三方系统集成
+
+```sql
+-- 返回 text: l7KTjHKuvrP6cAY4J6FofBmzHej8IHeeiSOApA==
+SELECT sm4_c_encrypt_gcm_base64('hello world!', 'key', 'iv');
+```
+
+### 选择建议
+
+```sql
+-- 场景1：数据库存储 - 使用二进制版本
+CREATE TABLE users (
+    id INT,
+    encrypted_data BYTEA  -- 使用 sm4_c_encrypt_gcm
+);
+
+-- 场景2：API 返回 - 使用 Base64 版本
+CREATE OR REPLACE FUNCTION get_user_data(uid INT)
+RETURNS JSON AS $$
+SELECT json_build_object(
+    'user_id', uid,
+    'encrypted_token', sm4_c_encrypt_gcm_base64(token, key, iv)
+) FROM tokens WHERE user_id = uid;
+$$ LANGUAGE SQL;
+```
 
 ## 注意事项
 

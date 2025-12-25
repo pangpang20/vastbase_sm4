@@ -67,7 +67,7 @@ vsql -d test01 -f /home/vastbase/vasthome/share/postgresql/extension/sm4--1.0.sq
 
 ```sql
 -- 连接数据库
-vsql -d test01
+vsql -d test01 -r
 
 -- 创建SM4函数 (使用sm4_c_前缀避免与Java UDF冲突)
 CREATE OR REPLACE FUNCTION sm4_c_encrypt(plaintext text, key text)
@@ -101,7 +101,7 @@ RETURNS text AS 'sm4', 'sm4_decrypt_gcm' LANGUAGE C IMMUTABLE;
 
 ```sql
 -- 连接数据库
-vsql -d postgres
+vsql -d test01 -r
 
 -- 删除所有SM4 C扩展函数
 DROP FUNCTION IF EXISTS sm4_c_encrypt(text, text);
@@ -128,8 +128,7 @@ DROP FUNCTION IF EXISTS sm4_c_decrypt_gcm(bytea, text, text, text);
 ## 查看已安装的函数
 
 ```sql
--- 查看扩展
-\dx *sm4*
+vsql -d test01
 
 -- 查看所有SM4 C扩展函数
 \df sm4_c*
@@ -163,8 +162,8 @@ DROP FUNCTION IF EXISTS sm4_c_decrypt_gcm(bytea, text, text, text);
 ## 运行示例
 
 ```bash
-# 进入数据库，使用管理员权限用户
-vsql -d test01 -r
+# 进入数据库
+vsql -d test01
 
 ```
 
