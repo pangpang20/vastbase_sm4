@@ -96,6 +96,9 @@ RETURNS text AS 'sm4', 'sm4_decrypt_cbc' LANGUAGE C STRICT IMMUTABLE;
 -- 连接数据库
 vsql -d postgres
 
+-- 删除扩展（如果提示：ERROR:  EXTENSION is not yet supported.可以忽略）
+DROP EXTENSION IF EXISTS sm4 CASCADE;
+
 -- 删除所有SM4 C扩展函数
 DROP FUNCTION IF EXISTS sm4_c_encrypt(text, text);
 DROP FUNCTION IF EXISTS sm4_c_decrypt(bytea, text);
@@ -106,9 +109,11 @@ DROP FUNCTION IF EXISTS sm4_c_decrypt_cbc(bytea, text, text);
 ```
 
 **注意**：
+
 - 删除函数不会删除.so文件，只是在当前数据库中移除函数定义
 - 如需在多个数据库中删除，需要分别连接每个数据库执行删除命令
 - 如果要完全卸载扩展，还需要删除.so文件：
+
   ```bash
   rm -f /home/vastbase/vasthome/lib/postgresql/sm4.so
   rm -f /home/vastbase/vasthome/lib/postgresql/proc_srclib/sm4.so
@@ -117,6 +122,9 @@ DROP FUNCTION IF EXISTS sm4_c_decrypt_cbc(bytea, text, text);
 ## 查看已安装的函数
 
 ```sql
+-- 查看扩展
+\dx *sm4*
+
 -- 查看所有SM4 C扩展函数
 \df sm4_c*
 
