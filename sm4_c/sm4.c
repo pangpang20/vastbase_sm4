@@ -353,3 +353,308 @@ int sm4_cbc_decrypt(const uint8_t *key, const uint8_t *iv,
 
     return 0;
 }
+
+/* GF(2^128)中的乘法运算 (用于GHASH) */
+static void gf128_mul(const uint8_t *x, const uint8_t *y, uint8_t *result)
+{
+    uint8_t v[16];
+    uint8_t z[16] = {0};
+    int i, j, k;
+    uint8_t lsb;
+
+    memcpy(v, y, 16);
+
+    for (i = 0; i < 16; i++) {
+        for (j = 0; j < 8; j++) {
+            /* 如果 x[i] 的第 (7-j) 位为1 */
+            if (x[i] & (1 << (7 - j))) {
+                /* z = z ⊕ v */
+                for (k = 0; k < 16; k++) {
+                    z[k] ^= v[k];
+                }
+            }
+
+            /* v右移1位 */
+            lsb = v[15] & 1;
+            for (k = 15; k > 0; k--) {
+                v[k] = (v[k] >> 1) | (v[k - 1] << 7);
+            }
+            v[0] = v[0] >> 1;
+
+            /* 如果最低位为1,则与R异或 */
+            if (lsb) {
+                v[0] ^= 0xe1;
+            }
+        }
+    }
+
+    memcpy(result, z, 16);
+}
+
+/* GHASH函数 */
+static void ghash(const uint8_t *h, const uint8_t *data, size_t data_len, uint8_t *result)
+{
+    size_t i;
+    uint8_t block[16];
+
+    memset(result, 0, 16);
+
+    for (i = 0; i < data_len; i += 16) {
+        size_t block_len = (data_len - i < 16) ? (data_len - i) : 16;
+        int j;
+
+        memset(block, 0, 16);
+        memcpy(block, data + i, block_len);
+
+        /* result = result ⊕ block */
+        for (j = 0; j < 16; j++) {
+            result[j] ^= block[j];
+        }
+
+        /* result = result * H */
+        gf128_mul(result, h, result);
+    }
+}
+
+/* 增量函数 (用于GCM的计数器) */
+static void gcm_inc32(uint8_t *counter)
+{
+    uint32_t val;
+
+    /* 读取最后4字节作为大端序32位整数 */
+    val = ((uint32_t)counter[12] << 24) |
+          ((uint32_t)counter[13] << 16) |
+          ((uint32_t)counter[14] << 8) |
+          ((uint32_t)counter[15]);
+
+    val++;
+
+    /* 写回 */
+    counter[12] = (uint8_t)(val >> 24);
+    counter[13] = (uint8_t)(val >> 16);
+    counter[14] = (uint8_t)(val >> 8);
+    counter[15] = (uint8_t)(val);
+}
+
+/* GCTR函数 (GCM的计数器模式加密) */
+static void gctr(const sm4_context *ctx, const uint8_t *icb, 
+                 const uint8_t *input, size_t input_len, uint8_t *output)
+{
+    uint8_t counter[16];
+    uint8_t encrypted_counter[16];
+    size_t i, j;
+
+    if (input_len == 0) {
+        return;
+    }
+
+    memcpy(counter, icb, 16);
+
+    for (i = 0; i < input_len; i += 16) {
+        sm4_encrypt_block(ctx, counter, encrypted_counter);
+
+        for (j = 0; j < 16 && (i + j) < input_len; j++) {
+            output[i + j] = input[i + j] ^ encrypted_counter[j];
+        }
+
+        gcm_inc32(counter);
+    }
+}
+
+/* SM4 GCM模式加密 */
+int sm4_gcm_encrypt(const uint8_t *key, const uint8_t *iv, size_t iv_len,
+                    const uint8_t *aad, size_t aad_len,
+                    const uint8_t *input, size_t input_len,
+                    uint8_t *output, uint8_t *tag)
+{
+    sm4_context ctx;
+    uint8_t h[16] = {0};
+    uint8_t j0[16];
+    uint8_t ghash_input[1024];
+    size_t ghash_len = 0;
+    uint64_t aad_bits, input_bits;
+    uint8_t s[16];
+    int i;
+
+    if (!key || !iv || !output || !tag) {
+        return -1;
+    }
+
+    /* 设置密钥 */
+    sm4_setkey(&ctx, key);
+
+    /* 计算H = E(K, 0^128) */
+    sm4_encrypt_block(&ctx, h, h);
+
+    /* 计算J0 */
+    if (iv_len == 12) {
+        /* 推荐的IV长度 */
+        memcpy(j0, iv, 12);
+        j0[12] = j0[13] = j0[14] = 0;
+        j0[15] = 1;
+    } else {
+        /* 其他IV长度 */
+        uint8_t len_block[16] = {0};
+        uint64_t iv_bits = (uint64_t)iv_len * 8;
+        int j;
+
+        for (j = 0; j < 8; j++) {
+            len_block[15 - j] = (uint8_t)(iv_bits >> (j * 8));
+        }
+
+        memset(j0, 0, 16);
+        ghash(h, iv, iv_len, j0);
+
+        for (j = 0; j < 16; j++) {
+            j0[j] ^= len_block[j];
+        }
+        gf128_mul(j0, h, j0);
+    }
+
+    /* 加密: C = GCTR(K, inc32(J0), P) */
+    uint8_t icb[16];
+    memcpy(icb, j0, 16);
+    gcm_inc32(icb);
+    gctr(&ctx, icb, input, input_len, output);
+
+    /* 构造GHASH输入: AAD || 0* || C || 0* || len(AAD) || len(C) */
+    memset(ghash_input, 0, sizeof(ghash_input));
+    ghash_len = 0;
+
+    /* 添加AAD */
+    if (aad && aad_len > 0) {
+        memcpy(ghash_input, aad, aad_len);
+        ghash_len = aad_len;
+        /* 填充到16字节边界 */
+        if (ghash_len % 16 != 0) {
+            ghash_len += 16 - (ghash_len % 16);
+        }
+    }
+
+    /* 添加密文 */
+    memcpy(ghash_input + ghash_len, output, input_len);
+    ghash_len += input_len;
+    /* 填充到16字节边界 */
+    if (ghash_len % 16 != 0) {
+        ghash_len += 16 - (ghash_len % 16);
+    }
+
+    /* 添加长度字段 */
+    aad_bits = (uint64_t)aad_len * 8;
+    input_bits = (uint64_t)input_len * 8;
+
+    for (i = 0; i < 8; i++) {
+        ghash_input[ghash_len + i] = (uint8_t)(aad_bits >> (56 - i * 8));
+        ghash_input[ghash_len + 8 + i] = (uint8_t)(input_bits >> (56 - i * 8));
+    }
+    ghash_len += 16;
+
+    /* 计算S = GHASH(H, ghash_input) */
+    ghash(h, ghash_input, ghash_len, s);
+
+    /* Tag = MSB(GCTR(K, J0, S)) */
+    gctr(&ctx, j0, s, 16, tag);
+
+    return 0;
+}
+
+/* SM4 GCM模式解密 */
+int sm4_gcm_decrypt(const uint8_t *key, const uint8_t *iv, size_t iv_len,
+                    const uint8_t *aad, size_t aad_len,
+                    const uint8_t *input, size_t input_len,
+                    const uint8_t *tag, uint8_t *output)
+{
+    sm4_context ctx;
+    uint8_t h[16] = {0};
+    uint8_t j0[16];
+    uint8_t ghash_input[1024];
+    size_t ghash_len = 0;
+    uint64_t aad_bits, input_bits;
+    uint8_t s[16];
+    uint8_t computed_tag[16];
+    int i;
+
+    if (!key || !iv || !input || !tag || !output) {
+        return -1;
+    }
+
+    /* 设置密钥 */
+    sm4_setkey(&ctx, key);
+
+    /* 计算H = E(K, 0^128) */
+    sm4_encrypt_block(&ctx, h, h);
+
+    /* 计算J0 */
+    if (iv_len == 12) {
+        memcpy(j0, iv, 12);
+        j0[12] = j0[13] = j0[14] = 0;
+        j0[15] = 1;
+    } else {
+        uint8_t len_block[16] = {0};
+        uint64_t iv_bits = (uint64_t)iv_len * 8;
+        int j;
+
+        for (j = 0; j < 8; j++) {
+            len_block[15 - j] = (uint8_t)(iv_bits >> (j * 8));
+        }
+
+        memset(j0, 0, 16);
+        ghash(h, iv, iv_len, j0);
+
+        for (j = 0; j < 16; j++) {
+            j0[j] ^= len_block[j];
+        }
+        gf128_mul(j0, h, j0);
+    }
+
+    /* 构造GHASH输入用于验证 */
+    memset(ghash_input, 0, sizeof(ghash_input));
+    ghash_len = 0;
+
+    /* 添加AAD */
+    if (aad && aad_len > 0) {
+        memcpy(ghash_input, aad, aad_len);
+        ghash_len = aad_len;
+        if (ghash_len % 16 != 0) {
+            ghash_len += 16 - (ghash_len % 16);
+        }
+    }
+
+    /* 添加密文 */
+    memcpy(ghash_input + ghash_len, input, input_len);
+    ghash_len += input_len;
+    if (ghash_len % 16 != 0) {
+        ghash_len += 16 - (ghash_len % 16);
+    }
+
+    /* 添加长度字段 */
+    aad_bits = (uint64_t)aad_len * 8;
+    input_bits = (uint64_t)input_len * 8;
+
+    for (i = 0; i < 8; i++) {
+        ghash_input[ghash_len + i] = (uint8_t)(aad_bits >> (56 - i * 8));
+        ghash_input[ghash_len + 8 + i] = (uint8_t)(input_bits >> (56 - i * 8));
+    }
+    ghash_len += 16;
+
+    /* 计算S = GHASH(H, ghash_input) */
+    ghash(h, ghash_input, ghash_len, s);
+
+    /* 计算Tag */
+    gctr(&ctx, j0, s, 16, computed_tag);
+
+    /* 验证Tag */
+    for (i = 0; i < 16; i++) {
+        if (computed_tag[i] != tag[i]) {
+            return -1;  /* 认证失败 */
+        }
+    }
+
+    /* 解密: P = GCTR(K, inc32(J0), C) */
+    uint8_t icb[16];
+    memcpy(icb, j0, 16);
+    gcm_inc32(icb);
+    gctr(&ctx, icb, input, input_len, output);
+
+    return 0;
+}
