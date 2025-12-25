@@ -62,7 +62,7 @@ AS 'sm4', 'sm4_encrypt_gcm'
 LANGUAGE C IMMUTABLE;
 
 COMMENT ON FUNCTION sm4_c_encrypt_gcm(text, text, text, text) IS 
-'SM4 GCM模式加密(C扩展)。参数: plaintext-明文, key-密钥(16字节或32位十六进制), iv-初始向量(12字节或24位十六进制), aad-附加认证数据(可选)。返回密文+Tag(16字节)。';
+'SM4 GCM模式加密(C扩展)。参数: plaintext-明文, key-密钥(16字节或32位十六进制), iv-初始向量(12或16字节，或24/32位十六进制，推荐12字节), aad-附加认证数据(可选)。返回密文+Tag(16字节)。';
 
 -- GCM模式解密 - C扩展版本
 CREATE OR REPLACE FUNCTION sm4_c_decrypt_gcm(ciphertext_with_tag bytea, key text, iv text, aad text DEFAULT NULL)
@@ -71,4 +71,4 @@ AS 'sm4', 'sm4_decrypt_gcm'
 LANGUAGE C IMMUTABLE;
 
 COMMENT ON FUNCTION sm4_c_decrypt_gcm(bytea, text, text, text) IS 
-'SM4 GCM模式解密(C扩展)。参数: ciphertext_with_tag-密文+Tag, key-密钥, iv-初始向量, aad-附加认证数据(可选)。返回明文。';
+'SM4 GCM模式解密(C扩展)。参数: ciphertext_with_tag-密文+Tag, key-密钥, iv-初始向量(12或16字节，或24/32位十六进制，必须与加密时相同), aad-附加认证数据(可选)。返回明文。';

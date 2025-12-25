@@ -164,13 +164,13 @@ DROP FUNCTION IF EXISTS sm4_c_decrypt_gcm(bytea, text, text, text);
 
 ```bash
 # 进入数据库，使用管理员权限用户
-vsql -d vastbase -r
+vsql -d test01 -r
 
 ```
 
 ```sql
 -- ECB模式加密 (返回十六进制)
-SELECT sm4_c_encrypt_hex('Hello VastBase!', '1234567890abcdef');
+SELECT sm4_c_encrypt_hex('Hello VastBase!', '12345678901abcdef');
 
 -- ECB模式解密
 SELECT sm4_c_decrypt_hex(sm4_c_encrypt_hex('Hello VastBase!', '1234567890abcdef'), '1234567890abcdef');

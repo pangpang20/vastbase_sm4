@@ -459,11 +459,12 @@ sm4_encrypt_gcm(PG_FUNCTION_ARGS)
     text *aad_text = PG_ARGISNULL(3) ? NULL : PG_GETARG_TEXT_PP(3);
     
     uint8_t key_bytes[SM4_KEY_SIZE];
-    uint8_t iv_bytes[SM4_GCM_IV_SIZE];
+    uint8_t iv_bytes[SM4_BLOCK_SIZE];  /* 最大支持16字节IV */
     char *plain_str;
     char *iv_str;
     size_t plain_len;
     size_t iv_len;
+    size_t iv_bytes_len;  /* 实际IV字节长度 */
     uint8_t *cipher;
     uint8_t tag[SM4_GCM_TAG_SIZE];
     bytea *result;
@@ -477,26 +478,39 @@ sm4_encrypt_gcm(PG_FUNCTION_ARGS)
                  errmsg("SM4 key must be 16 bytes or 32 hex characters")));
     }
 
-    /* 获取IV */
+    /* 获取IV - 支持12字节（推荐）或16字节 */
     iv_str = text_to_cstring(iv_text);
     iv_len = strlen(iv_str);
     
     if (iv_len == 12) {
+        /* 12字节原始字符串（推荐） */
         memcpy(iv_bytes, iv_str, 12);
+        iv_bytes_len = 12;
+    } else if (iv_len == 16) {
+        /* 16字节原始字符串 */
+        memcpy(iv_bytes, iv_str, 16);
+        iv_bytes_len = 16;
     } else if (iv_len == 24) {
-        /* 24位十六进制字符串 */
-        size_t bytes_len;
-        if (hex_to_bytes(iv_str, 24, iv_bytes, &bytes_len) != 0 || bytes_len != 12) {
+        /* 24位十六进制字符串 -> 12字节 */
+        if (hex_to_bytes(iv_str, 24, iv_bytes, &iv_bytes_len) != 0 || iv_bytes_len != 12) {
             pfree(iv_str);
             ereport(ERROR,
                     (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-                     errmsg("SM4 GCM IV must be 12 bytes or 24 hex characters")));
+                     errmsg("SM4 GCM IV: 24 hex characters must decode to 12 bytes")));
+        }
+    } else if (iv_len == 32) {
+        /* 32位十六进制字符串 -> 16字节 */
+        if (hex_to_bytes(iv_str, 32, iv_bytes, &iv_bytes_len) != 0 || iv_bytes_len != 16) {
+            pfree(iv_str);
+            ereport(ERROR,
+                    (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+                     errmsg("SM4 GCM IV: 32 hex characters must decode to 16 bytes")));
         }
     } else {
         pfree(iv_str);
         ereport(ERROR,
                 (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-                 errmsg("SM4 GCM IV must be 12 bytes or 24 hex characters")));
+                 errmsg("SM4 GCM IV must be 12 or 16 bytes (or 24/32 hex characters)")));
     }
     pfree(iv_str);
 
@@ -514,7 +528,7 @@ sm4_encrypt_gcm(PG_FUNCTION_ARGS)
     cipher = (uint8_t *)palloc(plain_len);
 
     /* 加密 */
-    if (sm4_gcm_encrypt(key_bytes, iv_bytes, 12,
+    if (sm4_gcm_encrypt(key_bytes, iv_bytes, iv_bytes_len,
                         (uint8_t *)aad_str, aad_len,
                         (uint8_t *)plain_str, plain_len,
                         cipher, tag) != 0) {
@@ -552,12 +566,13 @@ sm4_decrypt_gcm(PG_FUNCTION_ARGS)
     text *aad_text = PG_ARGISNULL(3) ? NULL : PG_GETARG_TEXT_PP(3);
     
     uint8_t key_bytes[SM4_KEY_SIZE];
-    uint8_t iv_bytes[SM4_GCM_IV_SIZE];
+    uint8_t iv_bytes[SM4_BLOCK_SIZE];  /* 最大支持16字节IV */
     uint8_t *cipher_with_tag;
     char *iv_str;
     size_t cipher_with_tag_len;
     size_t cipher_len;
     size_t iv_len;
+    size_t iv_bytes_len;  /* 实际IV字节长度 */
     uint8_t *cipher;
     uint8_t *tag;
     uint8_t *plain;
@@ -572,25 +587,39 @@ sm4_decrypt_gcm(PG_FUNCTION_ARGS)
                  errmsg("SM4 key must be 16 bytes or 32 hex characters")));
     }
 
-    /* 获取IV */
+    /* 获取IV - 支持12字节（推荐）或16字节 */
     iv_str = text_to_cstring(iv_text);
     iv_len = strlen(iv_str);
     
     if (iv_len == 12) {
+        /* 12字节原始字符串（推荐） */
         memcpy(iv_bytes, iv_str, 12);
+        iv_bytes_len = 12;
+    } else if (iv_len == 16) {
+        /* 16字节原始字符串 */
+        memcpy(iv_bytes, iv_str, 16);
+        iv_bytes_len = 16;
     } else if (iv_len == 24) {
-        size_t bytes_len;
-        if (hex_to_bytes(iv_str, 24, iv_bytes, &bytes_len) != 0 || bytes_len != 12) {
+        /* 24位十六进制字符串 -> 12字节 */
+        if (hex_to_bytes(iv_str, 24, iv_bytes, &iv_bytes_len) != 0 || iv_bytes_len != 12) {
             pfree(iv_str);
             ereport(ERROR,
                     (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-                     errmsg("SM4 GCM IV must be 12 bytes or 24 hex characters")));
+                     errmsg("SM4 GCM IV: 24 hex characters must decode to 12 bytes")));
+        }
+    } else if (iv_len == 32) {
+        /* 32位十六进制字符串 -> 16字节 */
+        if (hex_to_bytes(iv_str, 32, iv_bytes, &iv_bytes_len) != 0 || iv_bytes_len != 16) {
+            pfree(iv_str);
+            ereport(ERROR,
+                    (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+                     errmsg("SM4 GCM IV: 32 hex characters must decode to 16 bytes")));
         }
     } else {
         pfree(iv_str);
         ereport(ERROR,
                 (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-                 errmsg("SM4 GCM IV must be 12 bytes or 24 hex characters")));
+                 errmsg("SM4 GCM IV must be 12 or 16 bytes (or 24/32 hex characters)")));
     }
     pfree(iv_str);
 
@@ -620,7 +649,7 @@ sm4_decrypt_gcm(PG_FUNCTION_ARGS)
     plain = (uint8_t *)palloc(cipher_len + 1);
 
     /* 解密 */
-    if (sm4_gcm_decrypt(key_bytes, iv_bytes, 12,
+    if (sm4_gcm_decrypt(key_bytes, iv_bytes, iv_bytes_len,
                         (uint8_t *)aad_str, aad_len,
                         cipher, cipher_len,
                         tag, plain) != 0) {

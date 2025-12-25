@@ -23,11 +23,18 @@ GCM (Galois/Counter Mode) 是一种认证加密模式，提供数据的保密性
 - 常用于存储元数据、协议头等信息
 - AAD 是可选的，可以为 NULL
 
-### 3. 初始向量 (IV)
+### 3. 初始向量 (IV/Nonce)
 
-- GCM 推荐使用 12 字节的 IV
+- **推荐使用 12 字节的 IV**（96位）：性能最优，无需额外 GHASH 计算
+- **支持 16 字节的 IV**（128位）：用于与某些系统兼容或与 CBC 模式保持一致
 - 每次加密都应使用不同的 IV
 - IV 不需要保密，但必须是唯一的
+- **重要**：同一密钥下每个 IV 只能使用一次
+
+**IV 长度选择建议：**
+- ✅ **12 字节**（推荐）：符合 NIST SP 800-38D 推荐，性能最佳
+- ✅ **16 字节**（兼容）：与 CBC 模式 IV 长度一致，便于统一管理
+- ❌ 其他长度：虽然 GCM 标准支持，但本实现暂未开放
 
 ## 函数接口
 
@@ -37,7 +44,7 @@ GCM (Galois/Counter Mode) 是一种认证加密模式，提供数据的保密性
 sm4_c_encrypt_gcm(
     plaintext text,      -- 明文
     key text,            -- 密钥 (16字节或32位十六进制)
-    iv text,             -- 初始向量 (12字节或24位十六进制)
+    iv text,             -- 初始向量 (12或16字节，或24/32位十六进制，推荐12字节)
     aad text DEFAULT NULL -- 附加认证数据 (可选)
 ) RETURNS bytea          -- 返回: 密文 + 16字节认证标签
 ```
@@ -48,7 +55,7 @@ sm4_c_encrypt_gcm(
 sm4_c_decrypt_gcm(
     ciphertext_with_tag bytea, -- 密文+标签
     key text,                   -- 密钥
-    iv text,                    -- 初始向量 (必须与加密时相同)
+    iv text,                    -- 初始向量 (12或16字节，或24/32位十六进制，必须与加密时相同)
     aad text DEFAULT NULL       -- 附加认证数据 (必须与加密时相同)
 ) RETURNS text                  -- 返回: 明文 (如果认证失败则报错)
 ```
@@ -96,17 +103,47 @@ SELECT sm4_c_decrypt_gcm(
 ### 3. 使用十六进制格式的密钥和 IV
 
 ```sql
--- 使用十六进制密钥和 IV
+-- 使用十六进制密钥和 12 字节 IV
 SELECT sm4_c_encrypt_gcm(
     'Test Data',
     '31323334353637383930313233343536',  -- 32位十六进制密钥
-    '313233343536373839303132'           -- 24位十六进制IV
+    '313233343536373839303132'           -- 24位十六进制IV (12字节)
 ) AS encrypted_hex \gset
 
 SELECT sm4_c_decrypt_gcm(
     :'encrypted_hex',
     '31323334353637383930313233343536',
     '313233343536373839303132'
+);
+```
+
+### 4. 使用 16 字节 IV（与 CBC 模式保持一致）
+
+```sql
+-- 使用 16 字节 IV（与 SM4 块大小相同）
+SELECT sm4_c_encrypt_gcm(
+    'Compatible Data',
+    '1234567890123456',    -- 16字节密钥
+    '1234567890123456'     -- 16字节IV
+) AS encrypted_16 \gset
+
+SELECT sm4_c_decrypt_gcm(
+    :'encrypted_16',
+    '1234567890123456',
+    '1234567890123456'
+);
+
+-- 使用 32 位十六进制 IV（16 字节）
+SELECT sm4_c_encrypt_gcm(
+    'Hex IV Test',
+    'mykey1234567890',
+    '31323334353637383930313233343536'  -- 32位十六进制 = 16字节
+) AS encrypted_hex_16 \gset
+
+SELECT sm4_c_decrypt_gcm(
+    :'encrypted_hex_16',
+    'mykey1234567890',
+    '31323334353637383930313233343536'
 );
 ```
 
@@ -301,18 +338,39 @@ SELECT sm4_c_decrypt_gcm(
 
 ### 问题2: IV 长度错误
 
-**错误信息**: "SM4 GCM IV must be 12 bytes or 24 hex characters"
+**错误信息**: "SM4 GCM IV must be 12 or 16 bytes (or 24/32 hex characters)"
 
 **解决**:
 ```sql
--- ✅ 正确：12字节字符串
+-- ✅ 正确：12字节字符串（推荐）
 SELECT sm4_c_encrypt_gcm('data', 'key', '123456789012');
 
--- ✅ 正确：24位十六进制
+-- ✅ 正确：16字节字符串
+SELECT sm4_c_encrypt_gcm('data', 'key', '1234567890123456');
+
+-- ✅ 正确：24位十六进制（12字节）
 SELECT sm4_c_encrypt_gcm('data', 'key', '313233343536373839303132');
+
+-- ✅ 正确：32位十六进制（16字节）
+SELECT sm4_c_encrypt_gcm('data', 'key', '31323334353637383930313233343536');
 
 -- ❌ 错误：长度不对
 SELECT sm4_c_encrypt_gcm('data', 'key', '12345');
+```
+
+### 问题3: 12 字节 vs 16 字节 IV 的选择
+
+**建议**:
+- **默认使用 12 字节**：符合 NIST 推荐，性能最优
+- **16 字节适用场景**：
+  - 需要与使用 16 字节 IV 的旧系统兼容
+  - 希望 GCM 和 CBC 模式使用相同长度的 IV，便于统一管理
+  - 应用程序已经存在大量 16 字节 IV 的生成逻辑
+
+```sql
+-- 性能比较（理论上 12 字节略快）
+-- 12 字节：直接使用，无需 GHASH 计算
+-- 16 字节：需要额外的 GHASH 计算，但差异微乎其微
 ```
 
 ## 技术实现
