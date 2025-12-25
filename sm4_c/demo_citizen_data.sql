@@ -8,7 +8,7 @@
 
 -- 定义加密密钥(实际应用中应使用密钥管理系统)
 -- 注意: 生产环境不要硬编码密钥!
-\set ENCRYPTION_KEY '\'gov2024secret12\''
+\set ENCRYPTION_KEY '\'gov2024secret123\''
 
 \echo '========================================'
 \echo '创建公民信息表'
@@ -236,7 +236,7 @@ ORDER BY citizen_id;
 SELECT 
     citizen_id,
     name,
-    sm4_decrypt(phone_encrypted, :ENCRYPTION_KEY) AS phone,
+    sm4_c_decrypt(phone_encrypted, :ENCRYPTION_KEY) AS phone,
     city,
     address
 FROM citizen_info
@@ -270,11 +270,11 @@ SELECT
     birth_date,
     EXTRACT(YEAR FROM age(birth_date)) AS age,
     -- 自动脱敏的身份证
-    SUBSTRING(sm4_decrypt(id_card_encrypted, :ENCRYPTION_KEY), 1, 6) || '********' || 
-    SUBSTRING(sm4_decrypt(id_card_encrypted, :ENCRYPTION_KEY), 15, 4) AS id_card,
+    SUBSTRING(sm4_c_decrypt(id_card_encrypted, :ENCRYPTION_KEY), 1, 6) || '********' || 
+    SUBSTRING(sm4_c_decrypt(id_card_encrypted, :ENCRYPTION_KEY), 15, 4) AS id_card,
     -- 自动脱敏的手机号
-    SUBSTRING(sm4_decrypt(phone_encrypted, :ENCRYPTION_KEY), 1, 3) || '****' || 
-    SUBSTRING(sm4_decrypt(phone_encrypted, :ENCRYPTION_KEY), 8, 4) AS phone,
+    SUBSTRING(sm4_c_decrypt(phone_encrypted, :ENCRYPTION_KEY), 1, 3) || '****' || 
+    SUBSTRING(sm4_c_decrypt(phone_encrypted, :ENCRYPTION_KEY), 8, 4) AS phone,
     province,
     city,
     district,
