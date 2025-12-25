@@ -42,29 +42,31 @@ vastbase_sm4/
 
 ### 提供的SQL函数
 
+**重要提示**: 为避免与VastBase系统函数冲突，C扩展函数使用 `sm4_c_` 前缀。
+
 ```sql
 -- ECB模式
-sm4_encrypt(text, text) RETURNS bytea
-sm4_decrypt(bytea, text) RETURNS text
-sm4_encrypt_hex(text, text) RETURNS text
-sm4_decrypt_hex(text, text) RETURNS text
+sm4_c_encrypt(text, text) RETURNS bytea
+sm4_c_decrypt(bytea, text) RETURNS text
+sm4_c_encrypt_hex(text, text) RETURNS text
+sm4_c_decrypt_hex(text, text) RETURNS text
 
 -- CBC模式
-sm4_encrypt_cbc(text, text, text) RETURNS bytea
-sm4_decrypt_cbc(bytea, text, text) RETURNS text
+sm4_c_encrypt_cbc(text, text, text) RETURNS bytea
+sm4_c_decrypt_cbc(bytea, text, text) RETURNS text
 ```
 
 ### C扩展使用示例
 
 ```sql
 -- ECB模式加密
-SELECT sm4_encrypt_hex('13800138001', 'mykey1234567890') AS encrypted_phone;
+SELECT sm4_c_encrypt_hex('13800138001', 'mykey1234567890') AS encrypted_phone;
 
 -- ECB模式解密
-SELECT sm4_decrypt_hex('encrypted_hex_string', 'mykey1234567890') AS phone;
+SELECT sm4_c_decrypt_hex('encrypted_hex_string', 'mykey1234567890') AS phone;
 
 -- CBC模式加密（更安全）
-SELECT sm4_encrypt_cbc('sensitive data', 'mykey1234567890', '1234567890abcdef');
+SELECT sm4_c_encrypt_cbc('sensitive data', 'mykey1234567890', '1234567890abcdef');
 ```
 
 ### C扩展应用场景
@@ -74,7 +76,7 @@ SELECT sm4_encrypt_cbc('sensitive data', 'mykey1234567890', '1234567890abcdef');
 - ✅ 数据脱敏查询
 - ✅ 政务系统数据安全
 
-**详细文档**: 查看 [sm4_c/README_SM4_C.md](sm4_c/README_SM4_C.md)
+**详细文档**: 查看 [sm4_c/README.md](sm4_c/README.md)
 
 ---
 
@@ -84,7 +86,7 @@ SELECT sm4_encrypt_cbc('sensitive data', 'mykey1234567890', '1234567890abcdef');
 **目标平台**: MRS Hive 3.1.3+  
 **加密算法**: SM4国密算法（与数据库扩展完全兼容）
 
-### C主要功能
+### 主要功能
 
 - ✅ 4个Hive UDF函数（ECB/CBC加密解密）
 - ✅ Base64编码输出（便于Hive存储）
@@ -201,8 +203,8 @@ FROM users_encrypted;
 ### 1. 密钥管理
 
 ```bash
-# 不要硬编码密钥
-SELECT sm4_encrypt('data', 'hardcoded_key');
+# ❌ 不要硬编码密钥
+SELECT sm4_c_encrypt('data', 'hardcoded_key');
 
 # 使用环境变量
 export SM4_KEY="your_secret_key"
@@ -226,9 +228,9 @@ export SM4_KEY="your_secret_key"
 ### 4. 访问控制
 
 ```sql
--- VastBase: 限制函数执行权限
-REVOKE EXECUTE ON FUNCTION sm4_decrypt FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION sm4_decrypt TO trusted_role;
+-- VastBase: 限制函数执行权限（使用sm4_c_*函数）
+REVOKE EXECUTE ON FUNCTION sm4_c_decrypt FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION sm4_c_decrypt TO trusted_role;
 
 -- Hive: 使用脱敏视图
 CREATE VIEW users_masked AS
@@ -239,8 +241,8 @@ GRANT SELECT ON users_masked TO analyst_role;
 ### 互操作性测试
 
 ```sql
--- 在VastBase中加密
-SELECT sm4_encrypt_hex('test data', 'mykey1234567890') AS encrypted;
+-- 在VastBase中加密（使用C扩展）
+SELECT sm4_c_encrypt_hex('test data', 'mykey1234567890') AS encrypted;
 -- 输出: a1b2c3d4e5f6...
 
 -- 在Hive中解密（转换为Base64）

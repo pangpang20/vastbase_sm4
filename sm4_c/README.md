@@ -96,9 +96,6 @@ RETURNS text AS 'sm4', 'sm4_decrypt_cbc' LANGUAGE C STRICT IMMUTABLE;
 -- 连接数据库
 vsql -d postgres
 
--- 删除扩展（如果提示：ERROR:  EXTENSION is not yet supported.可以忽略）
-DROP EXTENSION IF EXISTS sm4 CASCADE;
-
 -- 删除所有SM4 C扩展函数
 DROP FUNCTION IF EXISTS sm4_c_encrypt(text, text);
 DROP FUNCTION IF EXISTS sm4_c_decrypt(bytea, text);
