@@ -67,7 +67,7 @@ vsql -d test01 -f /home/vastbase/vasthome/share/postgresql/extension/sm4--1.0.sq
 
 ```sql
 -- 连接数据库
-vsql -d postgres
+vsql -d test01
 
 -- 创建SM4函数 (使用sm4_c_前缀避免与Java UDF冲突)
 CREATE OR REPLACE FUNCTION sm4_c_encrypt(plaintext text, key text)
