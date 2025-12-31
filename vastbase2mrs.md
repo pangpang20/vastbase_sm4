@@ -178,11 +178,26 @@ SELECT default.sm4_decrypt(
     'ls6vj8Wh9w/HRiFuxpPVFjAgRczy2i2A28HOrg==', 
     'EjRWeJASNFYSNFZ4kBI0Vg=='
 );
+
 ```
 
 **解密结果**:
 ```
 Hello World!
+```
+
+### 8.4 处理空值
+
+```sql
+-- 当 name 为 NULL 时，返回字符串 'NULL'
+SELECT 
+    name,
+    CASE 
+        WHEN name IS NULL THEN 'NULL'
+        ELSE sm4_c_encrypt_gcm_base64(name, '12345678901234561234567890123456', '12345678901234561234567890123456')
+    END AS encrypted_name
+FROM test0011;
+
 ```
 
 ---
