@@ -172,21 +172,43 @@ int sm2_set_private_key(sm2_context *ctx, const uint8_t *key)
     int ret = -1;
     int pkey_id;
     
-    fprintf(stderr, "[SM2_DEBUG] sm2_set_private_key: entering...\n");
+    fprintf(stderr, "[SM2_DEBUG] sm2_set_private_key: entering, ctx=%p, key=%p\n", (void*)ctx, (void*)key);
+    fflush(stderr);
+    
+    /* 检查参数 */
+    if (!ctx) {
+        fprintf(stderr, "[SM2_DEBUG] ERROR: ctx is NULL\n");
+        fflush(stderr);
+        return -1;
+    }
+    if (!key) {
+        fprintf(stderr, "[SM2_DEBUG] ERROR: key is NULL\n");
+        fflush(stderr);
+        return -1;
+    }
+    
+    /* 打印私钥前4字节用于验证 */
+    fprintf(stderr, "[SM2_DEBUG] key bytes: %02x %02x %02x %02x...\n", key[0], key[1], key[2], key[3]);
     fflush(stderr);
     
     /* 创建 SM2 密钥 */
+    fprintf(stderr, "[SM2_DEBUG] calling create_sm2_key...\n");
+    fflush(stderr);
     ec_key = create_sm2_key();
     if (!ec_key) {
         fprintf(stderr, "[SM2_DEBUG] create_sm2_key FAILED\n");
         fflush(stderr);
         goto cleanup;
     }
-    fprintf(stderr, "[SM2_DEBUG] create_sm2_key OK\n");
+    fprintf(stderr, "[SM2_DEBUG] create_sm2_key OK, ec_key=%p\n", (void*)ec_key);
     fflush(stderr);
     
     /* 设置私钥 */
+    fprintf(stderr, "[SM2_DEBUG] calling BN_bin2bn...\n");
+    fflush(stderr);
     priv_bn = BN_bin2bn(key, 32, NULL);
+    fprintf(stderr, "[SM2_DEBUG] BN_bin2bn returned %p\n", (void*)priv_bn);
+    fflush(stderr);
     if (!priv_bn) {
         fprintf(stderr, "[SM2_DEBUG] BN_bin2bn FAILED\n");
         fflush(stderr);
