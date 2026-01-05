@@ -200,6 +200,37 @@ SELECT sm2_c_get_pubkey('56341526383e7547383abf6f4f6460e9b8b964559ca258c1fda565a
 ### 2. 加密解密
 
 ```sql
+-- 普通SM2解密
+DO $$
+DECLARE
+    keypair text[];
+    priv_key text;
+    pub_key text;
+    cipher bytea;   -- sm2_c_encrypt 返回 bytea 类型
+    plain text;
+BEGIN
+    -- 生成密钥对
+    keypair := sm2_c_generate_key();
+    priv_key := keypair[1];
+    pub_key := keypair[2];
+    RAISE NOTICE '私钥: %', priv_key;
+    RAISE NOTICE '公钥: %', pub_key;
+    
+    -- 加密
+    cipher := sm2_c_encrypt('Hello SM2!', pub_key);
+    RAISE NOTICE '密文: %', cipher;
+    
+    -- 解密 (sm2_c_decrypt 接受 bytea 类型密文)
+    plain := sm2_c_decrypt(cipher, priv_key);
+    RAISE NOTICE '明文: %', plain;
+    
+    IF plain = 'Hello SM2!' THEN
+        RAISE NOTICE '测试成功！';
+    ELSE
+        RAISE EXCEPTION '解密结果不匹配！';
+    END IF;
+END $$;
+
 -- 十六进制格式加解密
 DO $$
 DECLARE
@@ -266,6 +297,7 @@ END $$;
 ### 3. 数字签名
 
 ```sql
+-- 十六进制格式加签名
 DO $$
 DECLARE
     keypair text[];
@@ -289,6 +321,33 @@ BEGIN
     -- 带用户ID签名
     signature := sm2_c_sign_hex('合同内容', priv_key, 'user@example.com');
     verified := sm2_c_verify_hex('合同内容', pub_key, signature, 'user@example.com');
+END $$;
+
+-- 普通签名
+DO $$
+DECLARE
+    keypair text[];
+    priv_key text;
+    pub_key text;
+    signature bytea;  -- sm2_c_sign 返回 bytea 类型
+    verified boolean;
+BEGIN
+    keypair := sm2_c_generate_key();
+    priv_key := keypair[1];
+    pub_key := keypair[2];
+    
+    -- 签名 (返回 bytea)
+    signature := sm2_c_sign('合同内容', priv_key);
+    RAISE NOTICE '签名: %', signature;
+    
+    -- 验签 (sm2_c_verify 接受 bytea 类型签名)
+    verified := sm2_c_verify('合同内容', pub_key, signature);
+    RAISE NOTICE '验签结果: %', verified;
+    
+    -- 带用户ID签名验签
+    signature := sm2_c_sign('合同内容', priv_key, 'user@example.com');
+    verified := sm2_c_verify('合同内容', pub_key, signature, 'user@example.com');
+    RAISE NOTICE '带用户ID验签结果: %', verified;
 END $$;
 
 ```
@@ -448,6 +507,6 @@ A: 检查以下几点：
 
 ---
 
-**最后更新**: 2025-12-24  
+**最后更新**: 2026-01-04 
 **版本**: 1.0.0  
 **基于标准**: GB/T 32918-2016
