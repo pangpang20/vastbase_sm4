@@ -349,7 +349,6 @@ static void sm2_bn_mod(sm2_bn *r, const sm2_bn512 *a, const sm2_bn *n)
 {
     /* 使用朴素的减法循环实现模运算 */
     sm2_bn q;
-    sm2_bn512 t;
     int i;
 
     /* 复制高256位作为商的估计 */
@@ -366,7 +365,6 @@ static void sm2_bn_mod(sm2_bn *r, const sm2_bn512 *a, const sm2_bn *n)
     while (sm2_bn_cmp(r, n) >= 0 || !sm2_bn_is_zero(&q)) {
         if (!sm2_bn_is_zero(&q)) {
             /* 高位不为零，减去 n * 2^256 的近似 */
-            sm2_bn temp;
             sm2_bn_sub(r, r, n);
             
             /* 更新q */
@@ -395,7 +393,7 @@ void sm2_bn_mod_mul(sm2_bn *r, const sm2_bn *a, const sm2_bn *b, const sm2_bn *n
 /* 扩展欧几里得算法求模逆 */
 int sm2_bn_mod_inv(sm2_bn *r, const sm2_bn *a, const sm2_bn *n)
 {
-    sm2_bn u, v, x1, x2, temp;
+    sm2_bn u, v, x1, x2;
     int k;
 
     if (sm2_bn_is_zero(a)) {

@@ -8,6 +8,8 @@
 #include "postgres.h"
 #include "fmgr.h"
 #include "utils/builtins.h"
+#include "utils/array.h"
+#include "catalog/pg_type.h"
 #include "mb/pg_wchar.h"
 #include "sm2.h"
 #include <string.h>
