@@ -170,25 +170,55 @@ int sm2_set_private_key(sm2_context *ctx, const uint8_t *key)
     EC_POINT *pub_point = NULL;
     EVP_PKEY *pkey = NULL;
     int ret = -1;
+    int pkey_id;
+    
+    fprintf(stderr, "[SM2_DEBUG] sm2_set_private_key: entering...\n");
+    fflush(stderr);
     
     /* 创建 SM2 密钥 */
     ec_key = create_sm2_key();
-    if (!ec_key) goto cleanup;
+    if (!ec_key) {
+        fprintf(stderr, "[SM2_DEBUG] create_sm2_key FAILED\n");
+        fflush(stderr);
+        goto cleanup;
+    }
+    fprintf(stderr, "[SM2_DEBUG] create_sm2_key OK\n");
+    fflush(stderr);
     
     /* 设置私钥 */
     priv_bn = BN_bin2bn(key, 32, NULL);
-    if (!priv_bn) goto cleanup;
+    if (!priv_bn) {
+        fprintf(stderr, "[SM2_DEBUG] BN_bin2bn FAILED\n");
+        fflush(stderr);
+        goto cleanup;
+    }
     
-    if (!EC_KEY_set_private_key(ec_key, priv_bn)) goto cleanup;
+    if (!EC_KEY_set_private_key(ec_key, priv_bn)) {
+        fprintf(stderr, "[SM2_DEBUG] EC_KEY_set_private_key FAILED\n");
+        fflush(stderr);
+        goto cleanup;
+    }
+    fprintf(stderr, "[SM2_DEBUG] Private key set to EC_KEY\n");
+    fflush(stderr);
     
     /* 计算公钥 */
     group = EC_KEY_get0_group(ec_key);
     pub_point = EC_POINT_new(group);
     if (!pub_point) goto cleanup;
     
-    if (!EC_POINT_mul(group, pub_point, priv_bn, NULL, NULL, NULL)) goto cleanup;
+    if (!EC_POINT_mul(group, pub_point, priv_bn, NULL, NULL, NULL)) {
+        fprintf(stderr, "[SM2_DEBUG] EC_POINT_mul FAILED\n");
+        fflush(stderr);
+        goto cleanup;
+    }
     
-    if (!EC_KEY_set_public_key(ec_key, pub_point)) goto cleanup;
+    if (!EC_KEY_set_public_key(ec_key, pub_point)) {
+        fprintf(stderr, "[SM2_DEBUG] EC_KEY_set_public_key FAILED\n");
+        fflush(stderr);
+        goto cleanup;
+    }
+    fprintf(stderr, "[SM2_DEBUG] Public key computed and set\n");
+    fflush(stderr);
     
     /* 创建 EVP_PKEY */
     pkey = EVP_PKEY_new();
@@ -200,8 +230,11 @@ int sm2_set_private_key(sm2_context *ctx, const uint8_t *key)
         goto cleanup;
     }
     
-    /* 注意：OpenSSL 3.0 不需要显式设置 SM2 类型，
-     * 因为 EVP_PKEY_assign_EC_KEY 会保留 EC_KEY 的曲线信息 */
+    /* 检查 EVP_PKEY 类型 */
+    pkey_id = EVP_PKEY_id(pkey);
+    fprintf(stderr, "[SM2_DEBUG] EVP_PKEY created, id=%d (EC=%d, SM2=%d)\n", 
+            pkey_id, EVP_PKEY_EC, EVP_PKEY_SM2);
+    fflush(stderr);
     
     /* 保存到上下文 */
     if (ctx->pkey) EVP_PKEY_free(ctx->pkey);
@@ -214,6 +247,9 @@ int sm2_set_private_key(sm2_context *ctx, const uint8_t *key)
     ec_key = NULL;  /* 防止被释放 */
     pkey = NULL;
     ret = 0;
+    
+    fprintf(stderr, "[SM2_DEBUG] sm2_set_private_key SUCCESS\n");
+    fflush(stderr);
     
 cleanup:
     if (priv_bn) BN_free(priv_bn);
@@ -373,30 +409,69 @@ int sm2_decrypt(const uint8_t *priv_key,
     EVP_PKEY_CTX *pctx = NULL;
     size_t out_len = *output_len;
     int ret = -1;
+    unsigned long err;
+    
+    /* 调试日志 */
+    fprintf(stderr, "[SM2_DEBUG] sm2_decrypt: input_len=%zu, output_len=%zu\n", input_len, *output_len);
+    fflush(stderr);
     
     sm2_init(&ctx);
     
     /* 设置私钥 */
+    fprintf(stderr, "[SM2_DEBUG] Setting private key...\n");
+    fflush(stderr);
     if (sm2_set_private_key(&ctx, priv_key) != 0) {
+        fprintf(stderr, "[SM2_DEBUG] sm2_set_private_key FAILED\n");
+        fflush(stderr);
         goto cleanup;
     }
+    fprintf(stderr, "[SM2_DEBUG] Private key set OK, pkey=%p\n", (void*)ctx.pkey);
+    fflush(stderr);
     
     /* 创建解密上下文 */
+    fprintf(stderr, "[SM2_DEBUG] Creating EVP_PKEY_CTX...\n");
+    fflush(stderr);
     pctx = EVP_PKEY_CTX_new(ctx.pkey, NULL);
-    if (!pctx) goto cleanup;
-    
-    /* 初始化解密 */
-    if (EVP_PKEY_decrypt_init(pctx) <= 0) goto cleanup;
-    
-    /* 执行解密 */
-    if (EVP_PKEY_decrypt(pctx, output, &out_len, input, input_len) <= 0) {
+    if (!pctx) {
+        err = ERR_get_error();
+        fprintf(stderr, "[SM2_DEBUG] EVP_PKEY_CTX_new FAILED, err=%lu\n", err);
+        fflush(stderr);
         goto cleanup;
     }
+    fprintf(stderr, "[SM2_DEBUG] EVP_PKEY_CTX created OK\n");
+    fflush(stderr);
+    
+    /* 初始化解密 */
+    fprintf(stderr, "[SM2_DEBUG] Calling EVP_PKEY_decrypt_init...\n");
+    fflush(stderr);
+    if (EVP_PKEY_decrypt_init(pctx) <= 0) {
+        err = ERR_get_error();
+        fprintf(stderr, "[SM2_DEBUG] EVP_PKEY_decrypt_init FAILED, err=%lu\n", err);
+        fflush(stderr);
+        goto cleanup;
+    }
+    fprintf(stderr, "[SM2_DEBUG] EVP_PKEY_decrypt_init OK\n");
+    fflush(stderr);
+    
+    /* 执行解密 */
+    fprintf(stderr, "[SM2_DEBUG] Calling EVP_PKEY_decrypt with output=%p, out_len=%zu...\n", 
+            (void*)output, out_len);
+    fflush(stderr);
+    if (EVP_PKEY_decrypt(pctx, output, &out_len, input, input_len) <= 0) {
+        err = ERR_get_error();
+        fprintf(stderr, "[SM2_DEBUG] EVP_PKEY_decrypt FAILED, err=%lu\n", err);
+        fflush(stderr);
+        goto cleanup;
+    }
+    fprintf(stderr, "[SM2_DEBUG] EVP_PKEY_decrypt OK, decrypted %zu bytes\n", out_len);
+    fflush(stderr);
     
     *output_len = out_len;
     ret = 0;
     
 cleanup:
+    fprintf(stderr, "[SM2_DEBUG] cleanup, ret=%d\n", ret);
+    fflush(stderr);
     if (pctx) EVP_PKEY_CTX_free(pctx);
     sm2_free(&ctx);
     return ret;

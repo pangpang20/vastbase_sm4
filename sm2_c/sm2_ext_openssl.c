@@ -14,6 +14,7 @@
 #include "sm2_openssl.h"
 #include <string.h>
 #include <stdlib.h>
+#include <openssl/err.h>  /* 用于 OpenSSL 错误信息 */
 
 PG_MODULE_MAGIC;
 
