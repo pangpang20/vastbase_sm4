@@ -41,6 +41,17 @@ cd /path/to/vastbase_sm4/sm2_c
 sudo bash install_openssl3.sh
 
 # 脚本将自动安装 OpenSSL 3.0 到 /usr/local/openssl-3.0
+
+# 检查版本
+export LD_LIBRARY_PATH=/usr/local/openssl-3.0/lib:$LD_LIBRARY_PATH
+chmod -R 777 /usr/local/openssl-3.0
+echo "/usr/local/openssl-3.0/lib" > /etc/ld.so.conf.d/openssl3.conf 
+ldconfig
+ldconfig -p | grep libssl.so.3
+# 输出：libssl.so.3 (libc6,AArch64) => /usr/local/openssl-3.0/lib/libssl.so.3
+
+/usr/local/openssl-3.0/bin/openssl version
+# 输出：OpenSSL 3.0.18 30 Sep 2025 (Library: OpenSSL 3.0.18 30 Sep 2025)
 ```
 
 2. **编译 SM2 扩展**
@@ -54,7 +65,11 @@ cd /home/vastbase/vastbase_sm4/sm2_c
 # 设置环境变量
 export VBHOME=/home/vastbase/vasthome
 export PATH=$VBHOME/bin:$PATH
-export LD_LIBRARY_PATH=$VBHOME/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$VBHOME/lib::/usr/local/openssl-3.0/lib:$LD_LIBRARY_PATH
+
+# 可选，新版本的数据库有这个冲突
+mv /home/vastbase/vasthome/lib/libcrypt.so.1 /home/vastbase/vasthome/lib/libcrypt.so.1.bak
+
 
 # 编译 (指定 OpenSSL 路径)
 make clean
