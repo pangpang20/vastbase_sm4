@@ -366,11 +366,8 @@ sm2_decrypt_hex(PG_FUNCTION_ARGS)
                  errmsg("Invalid hex ciphertext")));
     }
     
-    /* 先查询需要的缓冶区大小 */
-    plain_len = 0;
-    sm2_decrypt(priv_key, cipher, cipher_len, NULL, &plain_len);
-    
-    /* 分配足够的缓冶区 (+1 为结束符) */
+    /* SM2 最大明文长度 255 字节，分配 256 字节缓冶区 (+1 为结束符) */
+    plain_len = 256;
     plain = (uint8_t *)palloc(plain_len + 1);
     
     if (sm2_decrypt(priv_key, cipher, cipher_len, plain, &plain_len) != 0) {
@@ -471,11 +468,8 @@ sm2_decrypt_base64(PG_FUNCTION_ARGS)
                  errmsg("Invalid base64 ciphertext")));
     }
     
-    /* 先查询需要的缓冶区大小 */
-    plain_len = 0;
-    sm2_decrypt(priv_key, cipher, cipher_len, NULL, &plain_len);
-    
-    /* 分配足够的缓冶区 (+1 为结束符) */
+    /* SM2 最大明文长度 255 字节，分配 256 字节缓冶区 (+1 为结束符) */
+    plain_len = 256;
     plain = (uint8_t *)palloc(plain_len + 1);
     
     if (sm2_decrypt(priv_key, cipher, cipher_len, plain, &plain_len) != 0) {
@@ -567,11 +561,8 @@ sm2_decrypt_func(PG_FUNCTION_ARGS)
     cipher_len = VARSIZE(ciphertext) - VARHDRSZ;
     cipher = (uint8_t *)VARDATA(ciphertext);
     
-    /* 先查询需要的缓冶区大小 */
-    plain_len = 0;
-    sm2_decrypt(priv_key, cipher, cipher_len, NULL, &plain_len);
-    
-    /* 分配足够的缓冶区 (+1 为结束符) */
+    /* SM2 最大明文长度 255 字节，分配 256 字节缓冶区 (+1 为结束符) */
+    plain_len = 256;
     plain = (uint8_t *)palloc(plain_len + 1);
     
     if (sm2_decrypt(priv_key, cipher, cipher_len, plain, &plain_len) != 0) {

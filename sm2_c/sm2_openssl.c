@@ -371,7 +371,7 @@ int sm2_decrypt(const uint8_t *priv_key,
 {
     sm2_context ctx;
     EVP_PKEY_CTX *pctx = NULL;
-    size_t out_len = 0;
+    size_t out_len = *output_len;
     int ret = -1;
     
     sm2_init(&ctx);
@@ -388,19 +388,7 @@ int sm2_decrypt(const uint8_t *priv_key,
     /* 初始化解密 */
     if (EVP_PKEY_decrypt_init(pctx) <= 0) goto cleanup;
     
-    /* 第一次调用：查询需要的缓冲区大小 */
-    if (EVP_PKEY_decrypt(pctx, NULL, &out_len, input, input_len) <= 0) {
-        goto cleanup;
-    }
-    
-    /* 检查缓冲区是否足够大 */
-    if (out_len > *output_len) {
-        /* 缓冲区不够，返回需要的大小 */
-        *output_len = out_len;
-        goto cleanup;
-    }
-    
-    /* 第二次调用：执行实际解密 */
+    /* 执行解密 */
     if (EVP_PKEY_decrypt(pctx, output, &out_len, input, input_len) <= 0) {
         goto cleanup;
     }
