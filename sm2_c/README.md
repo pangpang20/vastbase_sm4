@@ -2,34 +2,6 @@
 
 国密SM2椭圆曲线公钥密码算法扩展，基于 **OpenSSL** 高性能实现，符合 GB/T 32918-2016 标准。
 
-## ⚠️ 重要: OpenSSL 版本要求
-
-**必须满足以下条件之一**:
-- ✅ **OpenSSL >= 3.0** (推荐)
-- ✅ **GmSSL** (国密专用)
-- ❌ OpenSSL 1.1.1 **不支持**
-
-### 检查当前版本
-
-```bash
-openssl version
-# 应该显示: OpenSSL 3.x.x
-```
-
-**如果版本为 1.1.1**，请先安装 OpenSSL 3.0：
-
-```bash
-# OpenSSL 3.0.18 源码包已包含在项目中：
-#   openssl_source/openssl-3.0.18.tar.gz
-
-# 直接运行离线安装脚本即可
-cd /path/to/vastbase_sm4/sm2_c
-sudo bash install_openssl3.sh
-
-# 详细指南请参考
-cat OPENSSL_UPGRADE_GUIDE.md
-```
-
 ## 功能特性
 
 - ✅ SM2密钥对生成
