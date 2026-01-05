@@ -209,9 +209,12 @@ DECLARE
     cipher text;
     plain text;
 BEGIN
+    -- 生成密钥对
     keypair := sm2_c_generate_key();
     priv_key := keypair[1];
     pub_key := keypair[2];
+    RAISE NOTICE '私钥: %', priv_key;
+    RAISE NOTICE '公钥: %', pub_key;
     
     -- 加密
     cipher := sm2_c_encrypt_hex('Hello SM2!', pub_key);
@@ -220,6 +223,12 @@ BEGIN
     -- 解密
     plain := sm2_c_decrypt_hex(cipher, priv_key);
     RAISE NOTICE '明文: %', plain;
+    
+    IF plain = 'Hello SM2!' THEN
+        RAISE NOTICE '✅ 测试成功！';
+    ELSE
+        RAISE EXCEPTION '❌ 解密结果不匹配';
+    END IF;
 END $$;
 
 -- Base64格式加解密

@@ -200,6 +200,9 @@ int sm2_set_private_key(sm2_context *ctx, const uint8_t *key)
         goto cleanup;
     }
     
+    /* 设置 EVP_PKEY 类型为 SM2 (关键！) */
+    EVP_PKEY_set_alias_type(pkey, EVP_PKEY_SM2);
+    
     /* 保存到上下文 */
     if (ctx->pkey) EVP_PKEY_free(ctx->pkey);
     if (ctx->ec_key) EC_KEY_free(ctx->ec_key);
@@ -249,6 +252,9 @@ int sm2_set_public_key(sm2_context *ctx, const uint8_t *key, size_t len)
         pkey = NULL;
         goto cleanup;
     }
+    
+    /* 设置 EVP_PKEY 类型为 SM2 (关键！) */
+    EVP_PKEY_set_alias_type(pkey, EVP_PKEY_SM2);
     
     /* 保存到上下文 */
     if (ctx->pkey) EVP_PKEY_free(ctx->pkey);
@@ -365,7 +371,7 @@ int sm2_decrypt(const uint8_t *priv_key,
 {
     sm2_context ctx;
     EVP_PKEY_CTX *pctx = NULL;
-    size_t out_len = *output_len;
+    size_t out_len = 0;
     int ret = -1;
     
     sm2_init(&ctx);
@@ -382,7 +388,19 @@ int sm2_decrypt(const uint8_t *priv_key,
     /* 初始化解密 */
     if (EVP_PKEY_decrypt_init(pctx) <= 0) goto cleanup;
     
-    /* 执行解密 */
+    /* 第一次调用：查询需要的缓冲区大小 */
+    if (EVP_PKEY_decrypt(pctx, NULL, &out_len, input, input_len) <= 0) {
+        goto cleanup;
+    }
+    
+    /* 检查缓冲区是否足够大 */
+    if (out_len > *output_len) {
+        /* 缓冲区不够，返回需要的大小 */
+        *output_len = out_len;
+        goto cleanup;
+    }
+    
+    /* 第二次调用：执行实际解密 */
     if (EVP_PKEY_decrypt(pctx, output, &out_len, input, input_len) <= 0) {
         goto cleanup;
     }
