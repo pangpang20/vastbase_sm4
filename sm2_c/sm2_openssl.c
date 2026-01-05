@@ -121,7 +121,6 @@ int sm2_generate_keypair(sm2_context *ctx)
 {
     EVP_PKEY_CTX *pctx = NULL;
     EVP_PKEY *pkey = NULL;
-    EC_KEY *ec_key = NULL;
     int ret = -1;
     
     /* 创建密钥生成上下文 */
@@ -137,26 +136,19 @@ int sm2_generate_keypair(sm2_context *ctx)
     /* 生成密钥对 */
     if (EVP_PKEY_keygen(pctx, &pkey) <= 0) goto cleanup;
     
-    /* 提取 EC_KEY */
-    ec_key = EVP_PKEY_get1_EC_KEY(pkey);
-    if (!ec_key) goto cleanup;
-    
     /* 保存到上下文 */
     if (ctx->pkey) EVP_PKEY_free(ctx->pkey);
-    if (ctx->ec_key) EC_KEY_free(ctx->ec_key);
     
     ctx->pkey = pkey;
-    ctx->ec_key = ec_key;
+    ctx->ec_key = NULL;  /* 通过 pkey 访问 ec_key */
     ctx->has_private_key = 1;
     ctx->has_public_key = 1;
     pkey = NULL;  /* 防止被释放 */
-    ec_key = NULL;
     ret = 0;
     
 cleanup:
     if (pctx) EVP_PKEY_CTX_free(pctx);
     if (pkey) EVP_PKEY_free(pkey);
-    if (ec_key) EC_KEY_free(ec_key);
     return ret;
 }
 
@@ -314,10 +306,10 @@ int sm2_set_public_key(sm2_context *ctx, const uint8_t *key, size_t len)
     
     /* 保存到上下文 */
     if (ctx->pkey) EVP_PKEY_free(ctx->pkey);
-    if (ctx->ec_key) EC_KEY_free(ctx->ec_key);
+    /* 注意：ec_key 的所有权已转移给 pkey，不要保存到 ctx->ec_key */
     
     ctx->pkey = pkey;
-    ctx->ec_key = ec_key;
+    ctx->ec_key = NULL;  /* 不再保存，由 pkey 管理 */
     ctx->has_public_key = 1;
     ec_key = NULL;  /* 防止被释放 */
     pkey = NULL;
@@ -332,11 +324,19 @@ cleanup:
 
 int sm2_derive_public_key(sm2_context *ctx)
 {
-    if (!ctx->has_private_key || !ctx->ec_key) return -1;
+    EC_KEY *ec_key;
+    const EC_GROUP *group;
+    const BIGNUM *priv;
+    EC_POINT *pub_point;
     
-    const EC_GROUP *group = EC_KEY_get0_group(ctx->ec_key);
-    const BIGNUM *priv = EC_KEY_get0_private_key(ctx->ec_key);
-    EC_POINT *pub_point = EC_POINT_new(group);
+    if (!ctx->has_private_key || !ctx->pkey) return -1;
+    
+    ec_key = (EC_KEY *)EVP_PKEY_get0_EC_KEY(ctx->pkey);
+    if (!ec_key) return -1;
+    
+    group = EC_KEY_get0_group(ec_key);
+    priv = EC_KEY_get0_private_key(ec_key);
+    pub_point = EC_POINT_new(group);
     
     if (!pub_point) return -1;
     
@@ -345,7 +345,7 @@ int sm2_derive_public_key(sm2_context *ctx)
         return -1;
     }
     
-    if (!EC_KEY_set_public_key(ctx->ec_key, pub_point)) {
+    if (!EC_KEY_set_public_key(ec_key, pub_point)) {
         EC_POINT_free(pub_point);
         return -1;
     }
@@ -357,9 +357,15 @@ int sm2_derive_public_key(sm2_context *ctx)
 
 int sm2_get_private_key(const sm2_context *ctx, uint8_t *key)
 {
-    if (!ctx->has_private_key || !ctx->ec_key) return -1;
+    const EC_KEY *ec_key;
+    const BIGNUM *priv;
     
-    const BIGNUM *priv = EC_KEY_get0_private_key(ctx->ec_key);
+    if (!ctx->has_private_key || !ctx->pkey) return -1;
+    
+    ec_key = EVP_PKEY_get0_EC_KEY(ctx->pkey);
+    if (!ec_key) return -1;
+    
+    priv = EC_KEY_get0_private_key(ec_key);
     if (!priv) return -1;
     
     BN_bn2binpad(priv, key, 32);
@@ -368,10 +374,17 @@ int sm2_get_private_key(const sm2_context *ctx, uint8_t *key)
 
 int sm2_get_public_key(const sm2_context *ctx, uint8_t *key)
 {
-    if (!ctx->has_public_key || !ctx->ec_key) return -1;
+    const EC_KEY *ec_key;
+    const EC_GROUP *group;
+    const EC_POINT *pub;
     
-    const EC_GROUP *group = EC_KEY_get0_group(ctx->ec_key);
-    const EC_POINT *pub = EC_KEY_get0_public_key(ctx->ec_key);
+    if (!ctx->has_public_key || !ctx->pkey) return -1;
+    
+    ec_key = EVP_PKEY_get0_EC_KEY(ctx->pkey);
+    if (!ec_key) return -1;
+    
+    group = EC_KEY_get0_group(ec_key);
+    pub = EC_KEY_get0_public_key(ec_key);
     
     if (!pub) return -1;
     
