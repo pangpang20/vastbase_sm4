@@ -118,15 +118,6 @@ cp /home/vastbase/vasthome/lib/postgresql/sm2.so /home/vastbase/vasthome/lib/pos
 vb_ctl restart
 ```
 
-### 快捷命令 (已安装 OpenSSL 3.0)
-
-```bash
-# 如果已经安装了 OpenSSL 3.0，直接编译
-make clean
-make OPENSSL_HOME=/usr/local/openssl-3.0
-make install OPENSSL_HOME=/usr/local/openssl-3.0
-```
-
 ## 启用扩展
 
 VastBase不支持EXTENSION语法，需直接执行SQL创建函数。
@@ -327,6 +318,7 @@ DROP FUNCTION IF EXISTS sm2_c_sign(text, text, text);
 DROP FUNCTION IF EXISTS sm2_c_verify(text, text, bytea, text);
 DROP FUNCTION IF EXISTS sm2_c_sign_hex(text, text, text);
 DROP FUNCTION IF EXISTS sm2_c_verify_hex(text, text, text, text);
+
 ```
 
 ## 安全建议
