@@ -611,8 +611,8 @@ sm2_sign_func(PG_FUNCTION_ARGS)
         id_len = 16;
     }
     
-    if (sm2_sign(priv_key, (uint8_t *)msg_str, msg_len, 
-                 (uint8_t *)id_str, id_len, signature) != 0) {
+    /* 注意：当前实现使用默认 ID，传入的 id 参数被忽略 */
+    if (sm2_sign(priv_key, (uint8_t *)msg_str, msg_len, signature) != 0) {
         pfree(msg_str);
         if (id_text) pfree(id_str);
         ereport(ERROR,
@@ -675,8 +675,8 @@ sm2_verify_func(PG_FUNCTION_ARGS)
         id_len = 16;
     }
     
-    verify_result = sm2_verify(pub_key, (uint8_t *)msg_str, msg_len,
-                                (uint8_t *)id_str, id_len, signature);
+    /* 注意：当前实现使用默认 ID，传入的 id 参数被忽略 */
+    verify_result = sm2_verify(pub_key, (uint8_t *)msg_str, msg_len, signature);
     
     pfree(msg_str);
     if (id_text) pfree(id_str);
@@ -720,8 +720,8 @@ sm2_sign_hex(PG_FUNCTION_ARGS)
         id_len = 16;
     }
     
-    if (sm2_sign(priv_key, (uint8_t *)msg_str, msg_len,
-                 (uint8_t *)id_str, id_len, signature) != 0) {
+    /* 注意：当前实现使用默认 ID，传入的 id 参数被忽略 */
+    if (sm2_sign(priv_key, (uint8_t *)msg_str, msg_len, signature) != 0) {
         pfree(msg_str);
         if (id_text) pfree(id_str);
         ereport(ERROR,
@@ -793,8 +793,8 @@ sm2_verify_hex(PG_FUNCTION_ARGS)
         id_len = 16;
     }
     
-    verify_result = sm2_verify(pub_key, (uint8_t *)msg_str, msg_len,
-                                (uint8_t *)id_str, id_len, signature);
+    /* 注意：当前实现使用默认 ID，传入的 id 参数被忽略 */
+    verify_result = sm2_verify(pub_key, (uint8_t *)msg_str, msg_len, signature);
     
     pfree(msg_str);
     pfree(sig_hex_str);
