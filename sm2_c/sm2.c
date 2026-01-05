@@ -344,50 +344,224 @@ static void sm2_bn_mul(sm2_bn512 *r, const sm2_bn *a, const sm2_bn *b)
     }
 }
 
-/* Barrett约减 (简化版本) */
-static void sm2_bn_mod(sm2_bn *r, const sm2_bn512 *a, const sm2_bn *n)
+/*
+ * SM2快速约减算法
+ * SM2素数 p = 2^256 - 2^224 - 2^96 + 2^64 - 1
+ * 
+ * 对于 512位数 A = A15*2^480 + A14*2^448 + ... + A1*2^32 + A0
+ * 使用特定的约减公式
+ */
+static void sm2_bn_mod_p(sm2_bn *r, const sm2_bn512 *a)
 {
-    /* 使用朴素的减法循环实现模运算 */
-    sm2_bn q;
+    int64_t carry;
+    uint64_t t[8];
     int i;
-
-    /* 复制高256位作为商的估计 */
-    for (i = 0; i < 8; i++) {
-        q.d[i] = a->d[i + 8];
-    }
-
+    
     /* 复制低256位 */
     for (i = 0; i < 8; i++) {
-        r->d[i] = a->d[i];
+        t[i] = a->d[i];
     }
-
-    /* 简单的减法循环 */
-    while (sm2_bn_cmp(r, n) >= 0 || !sm2_bn_is_zero(&q)) {
-        if (!sm2_bn_is_zero(&q)) {
-            /* 高位不为零，减去 n * 2^256 的近似 */
-            sm2_bn_sub(r, r, n);
-            
-            /* 更新q */
-            int64_t borrow = 0;
-            for (i = 0; i < 8; i++) {
-                borrow = (int64_t)q.d[i] - borrow;
-                q.d[i] = (uint32_t)borrow;
-                borrow = (borrow < 0) ? 1 : 0;
-                if (!borrow) break;
-            }
-        } else if (sm2_bn_cmp(r, n) >= 0) {
-            sm2_bn_sub(r, r, n);
+    
+    /* 
+     * SM2约减: 利用 p 的特殊结构
+     * 2^256 ≡ 2^224 + 2^96 - 2^64 + 1 (mod p)
+     */
+    
+    /* 处理 a[8..15] */
+    /* s1 = (a15, a14, a13, a12, a11, 0, a9, a8) */
+    t[0] += a->d[8];
+    t[1] += a->d[9];
+    /* t[2] += 0 */
+    t[3] += a->d[11];
+    t[4] += a->d[12];
+    t[5] += a->d[13];
+    t[6] += a->d[14];
+    t[7] += a->d[15];
+    
+    /* s2 = (0, a15, a14, a13, a12, 0, a10, a9) */
+    t[0] += a->d[9];
+    t[1] += a->d[10];
+    /* t[2] += 0 */
+    t[3] += a->d[12];
+    t[4] += a->d[13];
+    t[5] += a->d[14];
+    t[6] += a->d[15];
+    /* t[7] += 0 */
+    
+    /* s3 = (a15, a14, 0, 0, 0, a10, a9, a8) */
+    t[0] += a->d[8];
+    t[1] += a->d[9];
+    t[2] += a->d[10];
+    /* t[3..4] += 0 */
+    /* t[5] += 0 */
+    t[6] += a->d[14];
+    t[7] += a->d[15];
+    
+    /* s4 = (a8, a13, a15, a14, a13, a11, a10, a9) */
+    t[0] += a->d[9];
+    t[1] += a->d[10];
+    t[2] += a->d[11];
+    t[3] += a->d[13];
+    t[4] += a->d[14];
+    t[5] += a->d[15];
+    t[6] += a->d[13];
+    t[7] += a->d[8];
+    
+    /* s5 = (a10, a8, 0, 0, 0, a13, a12, a11) * 2 */
+    t[0] += (uint64_t)a->d[11] * 2;
+    t[1] += (uint64_t)a->d[12] * 2;
+    t[2] += (uint64_t)a->d[13] * 2;
+    /* t[3..5] += 0 */
+    t[6] += (uint64_t)a->d[8] * 2;
+    t[7] += (uint64_t)a->d[10] * 2;
+    
+    /* d1 = (a11, a9, 0, 0, a15, a14, a13, a12) */
+    t[0] -= a->d[12];
+    t[1] -= a->d[13];
+    t[2] -= a->d[14];
+    t[3] -= a->d[15];
+    /* t[4..5] -= 0 */
+    t[6] -= a->d[9];
+    t[7] -= a->d[11];
+    
+    /* d2 = (a12, 0, a10, a9, a8, a15, a14, a13) */
+    t[0] -= a->d[13];
+    t[1] -= a->d[14];
+    t[2] -= a->d[15];
+    t[3] -= a->d[8];
+    t[4] -= a->d[9];
+    t[5] -= a->d[10];
+    /* t[6] -= 0 */
+    t[7] -= a->d[12];
+    
+    /* d3 = (a13, 0, a11, a10, a9, 0, a15, a14) */
+    t[0] -= a->d[14];
+    t[1] -= a->d[15];
+    /* t[2] -= 0 */
+    t[3] -= a->d[9];
+    t[4] -= a->d[10];
+    t[5] -= a->d[11];
+    /* t[6] -= 0 */
+    t[7] -= a->d[13];
+    
+    /* d4 = (a14, 0, a12, a11, a10, 0, 0, a15) */
+    t[0] -= a->d[15];
+    /* t[1..2] -= 0 */
+    t[3] -= a->d[10];
+    t[4] -= a->d[11];
+    t[5] -= a->d[12];
+    /* t[6] -= 0 */
+    t[7] -= a->d[14];
+    
+    /* 进位传播 */
+    carry = 0;
+    for (i = 0; i < 8; i++) {
+        carry += (int64_t)t[i];
+        r->d[i] = (uint32_t)(carry & 0xFFFFFFFF);
+        carry >>= 32;
+    }
+    
+    /* 处理可能的溢出或下溢 */
+    while (carry > 0) {
+        sm2_bn_sub(r, r, &SM2_P_BN);
+        carry--;
+    }
+    while (carry < 0 || sm2_bn_cmp(r, &SM2_P_BN) >= 0) {
+        if (carry < 0) {
+            sm2_bn_add(r, r, &SM2_P_BN);
+            carry++;
         } else {
-            break;
+            sm2_bn_sub(r, r, &SM2_P_BN);
         }
     }
 }
 
+/* 通用模约减（用于模n运算） */
+static void sm2_bn_mod(sm2_bn *r, const sm2_bn512 *a, const sm2_bn *n)
+{
+    /* 使用移位和减法的方式进行约减 */
+    sm2_bn q, temp;
+    sm2_bn512 qn;
+    int i;
+    int cmp;
+    
+    /* 复制低256位到结果 */
+    for (i = 0; i < 8; i++) {
+        r->d[i] = a->d[i];
+    }
+    
+    /* 复制高256位作为商的估计 */
+    for (i = 0; i < 8; i++) {
+        q.d[i] = a->d[i + 8];
+    }
+    
+    /* 如果高位为0，只需简单约减 */
+    if (sm2_bn_is_zero(&q)) {
+        while (sm2_bn_cmp(r, n) >= 0) {
+            sm2_bn_sub(r, r, n);
+        }
+        return;
+    }
+    
+    /* q * n */
+    sm2_bn_mul(&qn, &q, n);
+    
+    /* 从qn中减去低256位 */
+    /* r = a - q*n 的低256位 */
+    {
+        int64_t borrow = 0;
+        for (i = 0; i < 8; i++) {
+            borrow = (int64_t)r->d[i] - (int64_t)qn.d[i] - borrow;
+            r->d[i] = (uint32_t)(borrow & 0xFFFFFFFF);
+            borrow = (borrow < 0) ? 1 : 0;
+        }
+        
+        /* 处理高位借位 */
+        for (i = 8; i < 16; i++) {
+            borrow = (int64_t)a->d[i] - (int64_t)qn.d[i] - borrow;
+            temp.d[i-8] = (uint32_t)(borrow & 0xFFFFFFFF);
+            borrow = (borrow < 0) ? 1 : 0;
+        }
+        
+        /* 如果高位不为零，需要调整 */
+        while (!sm2_bn_is_zero(&temp)) {
+            sm2_bn_add(r, r, n);
+            /* 减少temp */
+            int64_t borrow2 = 1;
+            for (i = 0; i < 8; i++) {
+                borrow2 = (int64_t)temp.d[i] - borrow2;
+                temp.d[i] = (uint32_t)(borrow2 & 0xFFFFFFFF);
+                borrow2 = (borrow2 < 0) ? 1 : 0;
+                if (!borrow2) break;
+            }
+        }
+    }
+    
+    /* 最终约减 */
+    while (sm2_bn_cmp(r, n) >= 0) {
+        sm2_bn_sub(r, r, n);
+    }
+}
+
+/* 模p乘法（使用快速约减） */
+void sm2_bn_mod_mul_p(sm2_bn *r, const sm2_bn *a, const sm2_bn *b)
+{
+    sm2_bn512 product;
+    sm2_bn_mul(&product, a, b);
+    sm2_bn_mod_p(r, &product);
+}
+
+/* 通用模乘法 */
 void sm2_bn_mod_mul(sm2_bn *r, const sm2_bn *a, const sm2_bn *b, const sm2_bn *n)
 {
     sm2_bn512 product;
     sm2_bn_mul(&product, a, b);
-    sm2_bn_mod(r, &product, n);
+    /* 判断是否为模p运算 */
+    if (sm2_bn_cmp(n, &SM2_P_BN) == 0) {
+        sm2_bn_mod_p(r, &product);
+    } else {
+        sm2_bn_mod(r, &product, n);
+    }
 }
 
 /* 扩展欧几里得算法求模逆 */
