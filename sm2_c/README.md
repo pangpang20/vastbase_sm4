@@ -19,27 +19,14 @@ openssl version
 **如果版本为 1.1.1**，请先安装 OpenSSL 3.0：
 
 ```bash
-# 步骤 1: 下载 OpenSSL 3.0.18 源码包
-# 在本地或有网络的机器上下载（选择任一镜像）：
+# OpenSSL 3.0.18 源码包已包含在项目中：
+#   openssl_source/openssl-3.0.18.tar.gz
 
-# 清华镜像（推荐）
-wget https://mirrors.tuna.tsinghua.edu.cn/openssl/source/openssl-3.0.18.tar.gz
-
-# 中科大镜像
-wget https://mirrors.ustc.edu.cn/openssl/source/openssl-3.0.18.tar.gz
-
-# 阿里云镜像
-wget https://mirrors.aliyun.com/openssl/source/openssl-3.0.18.tar.gz
-
-# 步骤 2: 将源码包上传到服务器
-# 使用 scp 或 WinSCP 等工具，上传到：
-#   /path/to/vastbase_sm4/sm2_c/openssl_source/openssl-3.0.18.tar.gz
-
-# 步骤 3: 使用离线安装脚本
+# 直接运行离线安装脚本即可
 cd /path/to/vastbase_sm4/sm2_c
 sudo bash install_openssl3.sh
 
-# 或查看详细指南
+# 详细指南请参考
 cat OPENSSL_UPGRADE_GUIDE.md
 ```
 
