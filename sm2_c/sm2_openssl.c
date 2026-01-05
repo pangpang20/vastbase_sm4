@@ -13,10 +13,20 @@
 #include <openssl/evp.h>
 #include <openssl/ec.h>
 #include <openssl/bn.h>
-#include <openssl/kdf.h>
-#include <openssl/core_names.h>
+#include <openssl/ecdsa.h>
+#include <openssl/ecdh.h>
+#include <openssl/objects.h>
+
+/* OpenSSL 版本兼容性检查 */
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#error "OpenSSL version must be >= 1.1.0"
+#endif
 
 /* SM2 曲线 NID */
+#ifndef NID_sm2
+/* OpenSSL 1.1.1 中 SM2 曲线的 NID */
+#define NID_sm2 1172
+#endif
 #define NID_SM2 NID_sm2
 
 /*

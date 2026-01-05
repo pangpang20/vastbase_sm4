@@ -1,6 +1,31 @@
 # SM2 Extension for VastBase
 
-国密SM2椭圆曲线公钥密码算法扩展，基于GB/T 32918-2016标准实现。
+国密SM2椭圆曲线公钥密码算法扩展，基于 **OpenSSL** 高性能实现，符合 GB/T 32918-2016 标准。
+
+## ⚠️ 重要: OpenSSL 版本要求
+
+**必须满足以下条件之一**:
+- ✅ **OpenSSL >= 3.0** (推荐)
+- ✅ **GmSSL** (国密专用)
+- ❌ OpenSSL 1.1.1 **不支持**
+
+### 检查当前版本
+
+```bash
+openssl version
+# 应该显示: OpenSSL 3.x.x
+```
+
+**如果版本为 1.1.1**，请先安装 OpenSSL 3.0：
+
+```bash
+# 使用一键安装脚本
+cd /path/to/vastbase_sm4/sm2_c
+sudo bash install_openssl3.sh
+
+# 或查看详细指南
+cat OPENSSL_UPGRADE_GUIDE.md
+```
 
 ## 功能特性
 
@@ -16,17 +41,33 @@
 
 ```text
 sm2_c/
-├── sm2.h               # SM2算法头文件
-├── sm2.c               # SM2算法实现 (椭圆曲线、SM3哈希、KDF)
-├── sm2_ext.c           # VastBase扩展接口
-├── sm2.control         # 扩展控制文件
-├── sm2--1.0.sql        # SQL函数定义
-├── Makefile            # 编译配置
-├── test_sm2.sql        # 测试脚本
-└── README.md           # 使用文档
+├── sm2_openssl.h           # SM2算法头文件 (OpenSSL版本)
+├── sm2_openssl.c           # SM2算法实现 (OpenSSL高性能)
+├── sm2_ext_openssl.c       # VastBase扩展接口
+├── sm2.control             # 扩展控制文件
+├── sm2--1.0.sql            # SQL函数定义
+├── Makefile                # 编译配置 (OpenSSL 3.0)
+├── test_sm2.sql            # 测试脚本
+├── install_openssl3.sh     # OpenSSL 3.0 一键安装脚本
+├── OPENSSL_UPGRADE_GUIDE.md # OpenSSL 升级指南
+└── README.md               # 使用文档
 ```
 
 ## 编译安装
+
+### 前置条件
+
+1. **安装 OpenSSL 3.0** (如果未安装)
+
+```bash
+# 使用一键安装脚本
+cd /path/to/vastbase_sm4/sm2_c
+sudo bash install_openssl3.sh
+
+# 脚本将自动安装 OpenSSL 3.0 到 /usr/local/openssl-3.0
+```
+
+2. **编译 SM2 扩展**
 
 ```bash
 # 进入代码目录
@@ -38,12 +79,18 @@ export VBHOME=/home/vastbase/vasthome
 export PATH=$VBHOME/bin:$PATH
 export LD_LIBRARY_PATH=$VBHOME/lib:$LD_LIBRARY_PATH
 
-# 编译
+# 编译 (指定 OpenSSL 路径)
 make clean
-make
+make OPENSSL_HOME=/usr/local/openssl-3.0
+
+# 检查编译结果
+ldd sm2.so | grep ssl
+# 应该显示:
+# libssl.so.3 => /usr/local/openssl-3.0/lib64/libssl.so.3
+# libcrypto.so.3 => /usr/local/openssl-3.0/lib64/libcrypto.so.3
 
 # 安装
-make install
+make install OPENSSL_HOME=/usr/local/openssl-3.0
 
 # 复制.so到proc_srclib目录
 mkdir -p /home/vastbase/vasthome/lib/postgresql/proc_srclib
@@ -51,6 +98,15 @@ cp /home/vastbase/vasthome/lib/postgresql/sm2.so /home/vastbase/vasthome/lib/pos
 
 # 重启数据库加载新扩展
 vb_ctl restart
+```
+
+### 快捷命令 (已安装 OpenSSL 3.0)
+
+```bash
+# 如果已经安装了 OpenSSL 3.0，直接编译
+make clean
+make OPENSSL_HOME=/usr/local/openssl-3.0
+make install OPENSSL_HOME=/usr/local/openssl-3.0
 ```
 
 ## 启用扩展

@@ -1,4 +1,6 @@
-# SM2 OpenSSL 版本快速开始
+# SM2 快速开始指南
+
+基于 OpenSSL 3.0 的高性能 SM2 国密算法扩展。
 
 ## 为什么选择 OpenSSL 版本？
 
@@ -6,34 +8,47 @@
 - 密钥生成: 纯C实现 >60秒 → OpenSSL **<5ms** (提升12000倍!)
 - 加解密: 纯C实现 ~500ms → OpenSSL **<1ms** (提升500倍)
 
-## 一键编译和测试
+## 一键安装 OpenSSL 3.0
 
 ### 在 VastBase 服务器上操作
 
 ```bash
-# 1. 检查 OpenSSL 版本
-openssl version
-# 需要 >= 3.0.0 (如果版本过低,参考下面的安装说明)
-
-# 2. 进入目录
+# 1. 进入目录
 cd /path/to/vastbase_sm4/sm2_c
 
-# 3. 清理旧文件
-make -f Makefile.openssl clean
+# 2. 运行一键安装脚本 (root 权限)
+sudo bash install_openssl3.sh
 
-# 4. 编译 (使用 OpenSSL 高性能版本)
-make -f Makefile.openssl
+# 脚本将自动完成:
+# - 下载 OpenSSL 3.0.12
+# - 编译安装到 /usr/local/openssl-3.0
+# - 配置动态链接库
+# - 验证 SM2 支持
+# 全程约 10-15 分钟
+```
 
-# 5. 检查编译结果
+## 编译 SM2 扩展
+
+```bash
+# 1. 进入目录
+cd /path/to/vastbase_sm4/sm2_c
+
+# 2. 清理旧文件
+make clean
+
+# 3. 编译 (指定 OpenSSL 3.0 路径)
+make OPENSSL_HOME=/usr/local/openssl-3.0
+
+# 4. 检查编译结果
 ls -lh sm2.so
 # 应该看到 sm2.so 文件 (约 50-100KB)
 
-# 6. 检查动态链接
+# 5. 检查动态链接
 ldd sm2.so | grep ssl
-# 应该能看到 libssl.so 和 libcrypto.so
+# 应该能看到指向 /usr/local/openssl-3.0 的库
 
-# 7. 安装
-sudo make -f Makefile.openssl install
+# 6. 安装
+sudo make install OPENSSL_HOME=/usr/local/openssl-3.0
 ```
 
 ## 测试使用
