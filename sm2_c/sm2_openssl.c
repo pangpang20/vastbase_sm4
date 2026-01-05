@@ -516,34 +516,76 @@ cleanup:
 
 int sm2_sign(const uint8_t *priv_key,
              const uint8_t *msg, size_t msg_len,
-             uint8_t *signature)
+             uint8_t *signature, size_t *sig_len)
 {
     sm2_context ctx;
     EVP_MD_CTX *mdctx = NULL;
     EVP_PKEY_CTX *pctx = NULL;
-    size_t sig_len = 64;
+    size_t max_sig_len = *sig_len;
     int ret = -1;
+    unsigned long err;
+    
+    fprintf(stderr, "[SM2_DEBUG] sm2_sign: msg_len=%zu, max_sig_len=%zu\n", msg_len, max_sig_len);
+    fflush(stderr);
     
     sm2_init(&ctx);
     
     /* 设置私钥 */
     if (sm2_set_private_key(&ctx, priv_key) != 0) {
+        fprintf(stderr, "[SM2_DEBUG] sm2_sign: set_private_key FAILED\n");
+        fflush(stderr);
         goto cleanup;
     }
+    fprintf(stderr, "[SM2_DEBUG] sm2_sign: private key set OK\n");
+    fflush(stderr);
     
     /* 创建签名上下文 */
     mdctx = EVP_MD_CTX_new();
-    if (!mdctx) goto cleanup;
+    if (!mdctx) {
+        fprintf(stderr, "[SM2_DEBUG] sm2_sign: EVP_MD_CTX_new FAILED\n");
+        fflush(stderr);
+        goto cleanup;
+    }
     
     /* 初始化签名 */
+    fprintf(stderr, "[SM2_DEBUG] sm2_sign: calling EVP_DigestSignInit...\n");
+    fflush(stderr);
     if (EVP_DigestSignInit(mdctx, &pctx, EVP_sm3(), NULL, ctx.pkey) <= 0) {
+        err = ERR_get_error();
+        fprintf(stderr, "[SM2_DEBUG] sm2_sign: EVP_DigestSignInit FAILED, err=%lu\n", err);
+        fflush(stderr);
+        goto cleanup;
+    }
+    fprintf(stderr, "[SM2_DEBUG] sm2_sign: EVP_DigestSignInit OK\n");
+    fflush(stderr);
+    
+    /* 第一步：查询签名需要的长度 */
+    *sig_len = 0;
+    if (EVP_DigestSign(mdctx, NULL, sig_len, msg, msg_len) <= 0) {
+        err = ERR_get_error();
+        fprintf(stderr, "[SM2_DEBUG] sm2_sign: EVP_DigestSign (query len) FAILED, err=%lu\n", err);
+        fflush(stderr);
+        goto cleanup;
+    }
+    fprintf(stderr, "[SM2_DEBUG] sm2_sign: signature needs %zu bytes\n", *sig_len);
+    fflush(stderr);
+    
+    /* 检查缓冲区大小 */
+    if (*sig_len > max_sig_len) {
+        fprintf(stderr, "[SM2_DEBUG] sm2_sign: buffer too small, need %zu, have %zu\n", *sig_len, max_sig_len);
+        fflush(stderr);
         goto cleanup;
     }
     
-    /* 执行签名 */
-    if (EVP_DigestSign(mdctx, signature, &sig_len, msg, msg_len) <= 0) {
+    /* 第二步：执行签名 */
+    if (EVP_DigestSign(mdctx, signature, sig_len, msg, msg_len) <= 0) {
+        err = ERR_get_error();
+        fprintf(stderr, "[SM2_DEBUG] sm2_sign: EVP_DigestSign FAILED, err=%lu\n", err);
+        fflush(stderr);
         goto cleanup;
     }
+    fprintf(stderr, "[SM2_DEBUG] sm2_sign: signature generated, len=%zu\n", *sig_len);
+    fflush(stderr);
     
     ret = 0;
     
@@ -555,33 +597,55 @@ cleanup:
 
 int sm2_verify(const uint8_t *pub_key,
                const uint8_t *msg, size_t msg_len,
-               const uint8_t *signature)
+               const uint8_t *signature, size_t sig_len)
 {
     sm2_context ctx;
     EVP_MD_CTX *mdctx = NULL;
     EVP_PKEY_CTX *pctx = NULL;
     int ret = -1;
+    unsigned long err;
+    
+    fprintf(stderr, "[SM2_DEBUG] sm2_verify: msg_len=%zu, sig_len=%zu\n", msg_len, sig_len);
+    fflush(stderr);
     
     sm2_init(&ctx);
     
     /* 设置公钥 */
     if (sm2_set_public_key(&ctx, pub_key, 64) != 0) {
+        fprintf(stderr, "[SM2_DEBUG] sm2_verify: set_public_key FAILED\n");
+        fflush(stderr);
         goto cleanup;
     }
+    fprintf(stderr, "[SM2_DEBUG] sm2_verify: public key set OK\n");
+    fflush(stderr);
     
     /* 创建验签上下文 */
     mdctx = EVP_MD_CTX_new();
     if (!mdctx) goto cleanup;
     
     /* 初始化验签 */
+    fprintf(stderr, "[SM2_DEBUG] sm2_verify: calling EVP_DigestVerifyInit...\n");
+    fflush(stderr);
     if (EVP_DigestVerifyInit(mdctx, &pctx, EVP_sm3(), NULL, ctx.pkey) <= 0) {
+        err = ERR_get_error();
+        fprintf(stderr, "[SM2_DEBUG] sm2_verify: EVP_DigestVerifyInit FAILED, err=%lu\n", err);
+        fflush(stderr);
         goto cleanup;
     }
+    fprintf(stderr, "[SM2_DEBUG] sm2_verify: EVP_DigestVerifyInit OK\n");
+    fflush(stderr);
     
     /* 执行验签 */
-    if (EVP_DigestVerify(mdctx, signature, 64, msg, msg_len) <= 0) {
+    fprintf(stderr, "[SM2_DEBUG] sm2_verify: calling EVP_DigestVerify...\n");
+    fflush(stderr);
+    if (EVP_DigestVerify(mdctx, signature, sig_len, msg, msg_len) <= 0) {
+        err = ERR_get_error();
+        fprintf(stderr, "[SM2_DEBUG] sm2_verify: EVP_DigestVerify FAILED, err=%lu\n", err);
+        fflush(stderr);
         goto cleanup;
     }
+    fprintf(stderr, "[SM2_DEBUG] sm2_verify: verification OK\n");
+    fflush(stderr);
     
     ret = 0;
     

@@ -225,17 +225,42 @@ BEGIN
     RAISE NOTICE '明文: %', plain;
     
     IF plain = 'Hello SM2!' THEN
-        RAISE NOTICE '✅ 测试成功！';
+        RAISE NOTICE '测试成功！';
     ELSE
-        RAISE EXCEPTION '❌ 解密结果不匹配';
+        RAISE EXCEPTION '解密结果不匹配！';
     END IF;
 END $$;
 
 -- Base64格式加解密
-SELECT sm2_c_decrypt_base64(
-    sm2_c_encrypt_base64('敏感数据', (sm2_c_generate_key())[2]),
-    (sm2_c_generate_key())[1]
-);
+DO $$
+DECLARE
+    keypair text[];
+    priv_key text;
+    pub_key text;
+    cipher text;
+    plain text;
+BEGIN
+    -- 生成密钥对
+    keypair := sm2_c_generate_key();
+    priv_key := keypair[1];
+    pub_key := keypair[2];
+    RAISE NOTICE '私钥: %', priv_key;
+    RAISE NOTICE '公钥: %', pub_key;
+    
+    -- 加密
+    cipher := sm2_c_encrypt_base64('Hello SM2!', pub_key);
+    RAISE NOTICE '密文: %', cipher;
+    
+    -- 解密
+    plain := sm2_c_decrypt_base64(cipher, priv_key);
+    RAISE NOTICE '明文: %', plain;
+    
+    IF plain = 'Hello SM2!' THEN
+        RAISE NOTICE '测试成功！';
+    ELSE
+        RAISE EXCEPTION '解密结果不匹配！';
+    END IF;
+END $$;
 ```
 
 ### 3. 数字签名
@@ -265,6 +290,7 @@ BEGIN
     signature := sm2_c_sign_hex('合同内容', priv_key, 'user@example.com');
     verified := sm2_c_verify_hex('合同内容', pub_key, signature, 'user@example.com');
 END $$;
+
 ```
 
 ### 4. 实际应用场景

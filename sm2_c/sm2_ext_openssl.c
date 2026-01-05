@@ -595,7 +595,8 @@ sm2_sign_func(PG_FUNCTION_ARGS)
     size_t msg_len;
     char *id_str = NULL;
     size_t id_len = 16;
-    uint8_t signature[64];
+    uint8_t signature[128];  /* SM2 DER 编码签名 */
+    size_t sig_len = sizeof(signature);
     bytea *result;
     
     if (get_private_key_bytes(priv_key_text, priv_key) != 0) {
@@ -616,7 +617,7 @@ sm2_sign_func(PG_FUNCTION_ARGS)
     }
     
     /* 注意：当前实现使用默认 ID，传入的 id 参数被忽略 */
-    if (sm2_sign(priv_key, (uint8_t *)msg_str, msg_len, signature) != 0) {
+    if (sm2_sign(priv_key, (uint8_t *)msg_str, msg_len, signature, &sig_len) != 0) {
         pfree(msg_str);
         if (id_text) pfree(id_str);
         ereport(ERROR,
@@ -624,9 +625,9 @@ sm2_sign_func(PG_FUNCTION_ARGS)
                  errmsg("SM2 signature failed")));
     }
     
-    result = (bytea *)palloc(VARHDRSZ + 64);
-    SET_VARSIZE(result, VARHDRSZ + 64);
-    memcpy(VARDATA(result), signature, 64);
+    result = (bytea *)palloc(VARHDRSZ + sig_len);
+    SET_VARSIZE(result, VARHDRSZ + sig_len);
+    memcpy(VARDATA(result), signature, sig_len);
     
     pfree(msg_str);
     if (id_text) pfree(id_str);
@@ -661,10 +662,11 @@ sm2_verify_func(PG_FUNCTION_ARGS)
     }
     
     sig_len = VARSIZE(signature_bytea) - VARHDRSZ;
-    if (sig_len != 64) {
+    /* SM2 DER 编码签名通常 70-72 字节 */
+    if (sig_len < 64 || sig_len > 128) {
         ereport(ERROR,
                 (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-                 errmsg("SM2 signature must be 64 bytes")));
+                 errmsg("SM2 signature length invalid: %zu bytes", sig_len)));
     }
     
     signature = (uint8_t *)VARDATA(signature_bytea);
@@ -680,7 +682,7 @@ sm2_verify_func(PG_FUNCTION_ARGS)
     }
     
     /* 注意：当前实现使用默认 ID，传入的 id 参数被忽略 */
-    verify_result = sm2_verify(pub_key, (uint8_t *)msg_str, msg_len, signature);
+    verify_result = sm2_verify(pub_key, (uint8_t *)msg_str, msg_len, signature, sig_len);
     
     pfree(msg_str);
     if (id_text) pfree(id_str);
@@ -703,7 +705,8 @@ sm2_sign_hex(PG_FUNCTION_ARGS)
     size_t msg_len;
     char *id_str = NULL;
     size_t id_len = 16;
-    uint8_t signature[64];
+    uint8_t signature[128];  /* SM2 DER 编码签名最多约 72 字节，分配足够空间 */
+    size_t sig_len = sizeof(signature);
     char *hex_str;
     text *result;
     
@@ -725,7 +728,7 @@ sm2_sign_hex(PG_FUNCTION_ARGS)
     }
     
     /* 注意：当前实现使用默认 ID，传入的 id 参数被忽略 */
-    if (sm2_sign(priv_key, (uint8_t *)msg_str, msg_len, signature) != 0) {
+    if (sm2_sign(priv_key, (uint8_t *)msg_str, msg_len, signature, &sig_len) != 0) {
         pfree(msg_str);
         if (id_text) pfree(id_str);
         ereport(ERROR,
@@ -733,8 +736,9 @@ sm2_sign_hex(PG_FUNCTION_ARGS)
                  errmsg("SM2 signature failed")));
     }
     
-    hex_str = (char *)palloc(129);
-    bytes_to_hex(signature, 64, hex_str);
+    /* 转换为十六进制，使用实际签名长度 */
+    hex_str = (char *)palloc(sig_len * 2 + 1);
+    bytes_to_hex(signature, sig_len, hex_str);
     result = cstring_to_text(hex_str);
     
     pfree(msg_str);
@@ -761,8 +765,9 @@ sm2_verify_hex(PG_FUNCTION_ARGS)
     char *id_str = NULL;
     size_t id_len = 16;
     char *sig_hex_str;
-    uint8_t signature[64];
+    uint8_t signature[128];  /* SM2 DER 编码签名 */
     size_t sig_len;
+    size_t hex_len;
     int verify_result;
     
     if (get_public_key_bytes(pub_key_text, pub_key) != 0) {
@@ -772,14 +777,16 @@ sm2_verify_hex(PG_FUNCTION_ARGS)
     }
     
     sig_hex_str = text_to_cstring(signature_hex_text);
-    if (strlen(sig_hex_str) != 128) {
+    hex_len = strlen(sig_hex_str);
+    /* SM2 DER 编码签名通常 140-144 个十六进制字符（70-72 字节） */
+    if (hex_len < 128 || hex_len > 256 || hex_len % 2 != 0) {
         pfree(sig_hex_str);
         ereport(ERROR,
                 (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-                 errmsg("SM2 signature must be 128 hex characters")));
+                 errmsg("SM2 signature hex length invalid: %zu characters", hex_len)));
     }
     
-    if (hex_to_bytes(sig_hex_str, 128, signature, &sig_len) != 0) {
+    if (hex_to_bytes(sig_hex_str, hex_len, signature, &sig_len) != 0) {
         pfree(sig_hex_str);
         ereport(ERROR,
                 (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -798,7 +805,7 @@ sm2_verify_hex(PG_FUNCTION_ARGS)
     }
     
     /* 注意：当前实现使用默认 ID，传入的 id 参数被忽略 */
-    verify_result = sm2_verify(pub_key, (uint8_t *)msg_str, msg_len, signature);
+    verify_result = sm2_verify(pub_key, (uint8_t *)msg_str, msg_len, signature, sig_len);
     
     pfree(msg_str);
     pfree(sig_hex_str);

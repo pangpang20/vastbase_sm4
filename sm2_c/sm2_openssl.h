@@ -87,18 +87,21 @@ int sm2_decrypt(const uint8_t *priv_key,
 
 /*
  * SM2 签名
- * signature: r || s (64字节)
+ * signature: DER 编码的签名（约 70-72 字节）
+ * sig_len: 输入缓冲区大小，输出实际签名长度
  */
 int sm2_sign(const uint8_t *priv_key,
              const uint8_t *msg, size_t msg_len,
-             uint8_t *signature);
+             uint8_t *signature, size_t *sig_len);
 
 /*
  * SM2 验签
+ * signature: DER 编码的签名
+ * sig_len: 签名长度
  * 返回: 0=验证通过, -1=验证失败
  */
 int sm2_verify(const uint8_t *pub_key,
                const uint8_t *msg, size_t msg_len,
-               const uint8_t *signature);
+               const uint8_t *signature, size_t sig_len);
 
 #endif /* SM2_OPENSSL_H */
