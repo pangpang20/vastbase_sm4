@@ -1,9 +1,10 @@
 #!/bin/bash
 #
-# OpenSSL 3.0 一键安装脚本
+# OpenSSL 3.0 离线编译安装脚本
 # 用于 SM2 扩展编译
 #
 # 使用方法: sudo bash install_openssl3.sh
+# 前置条件: 请将 openssl-3.0.18.tar.gz 放置在 openssl_source 目录中
 #
 
 set -e  # 遇到错误立即退出
@@ -21,17 +22,24 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # 配置变量
-OPENSSL_VERSION="3.0.12"
-# 使用多个镜像源（按优先级尝试）
-OPENSSL_URLS=(
-    "https://mirrors.tuna.tsinghua.edu.cn/openssl/source/openssl-${OPENSSL_VERSION}.tar.gz"
-    "https://mirrors.ustc.edu.cn/openssl/source/openssl-${OPENSSL_VERSION}.tar.gz"
-    "https://mirrors.aliyun.com/openssl/source/openssl-${OPENSSL_VERSION}.tar.gz"
-    "https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz"
-    "https://github.com/openssl/openssl/releases/download/openssl-${OPENSSL_VERSION}/openssl-${OPENSSL_VERSION}.tar.gz"
-)
+OPENSSL_VERSION="3.0.18"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SOURCE_DIR="${SCRIPT_DIR}/openssl_source"
 INSTALL_PREFIX="/usr/local/openssl-3.0"
 TEMP_DIR="/tmp/openssl-install"
+
+# 检查源码包是否存在
+if [ ! -f "${SOURCE_DIR}/openssl-${OPENSSL_VERSION}.tar.gz" ]; then
+    echo "错误: 未找到源码包"
+    echo "请将 openssl-${OPENSSL_VERSION}.tar.gz 放置在以下目录:"
+    echo "  ${SOURCE_DIR}/"
+    echo ""
+    echo "下载地址（选择其一）:"
+    echo "  清华镜像: https://mirrors.tuna.tsinghua.edu.cn/openssl/source/openssl-${OPENSSL_VERSION}.tar.gz"
+    echo "  中科大镜像: https://mirrors.ustc.edu.cn/openssl/source/openssl-${OPENSSL_VERSION}.tar.gz"
+    echo "  阿里云镜像: https://mirrors.aliyun.com/openssl/source/openssl-${OPENSSL_VERSION}.tar.gz"
+    exit 1
+fi
 
 echo "安装配置:"
 echo "  版本: OpenSSL ${OPENSSL_VERSION}"
@@ -51,85 +59,88 @@ if [ -f "${INSTALL_PREFIX}/bin/openssl" ]; then
 fi
 
 # 1. 安装编译依赖
-echo "[1/7] 安装编译依赖..."
-yum install -y gcc make perl zlib-devel wget || {
+echo "[1/6] 安装编译依赖..."
+yum install -y gcc make perl zlib-devel || {
     echo "错误: 安装依赖失败"
     exit 1
 }
 
-# 2. 创建临时目录
-echo "[2/7] 准备工作目录..."
+# 2. 创建临时目录并复制源码
+echo "[2/6] 准备工作目录..."
 mkdir -p ${TEMP_DIR}
 cd ${TEMP_DIR}
 
-# 3. 下载 OpenSSL
-echo "[3/7] 下载 OpenSSL ${OPENSSL_VERSION}..."
-if [ ! -f "openssl-${OPENSSL_VERSION}.tar.gz" ]; then
-    DOWNLOADED=0
-    for url in "${OPENSSL_URLS[@]}"; do
-        echo "尝试从: ${url}"
-        if wget --timeout=30 --tries=2 "${url}" -O "openssl-${OPENSSL_VERSION}.tar.gz" 2>/dev/null; then
-            DOWNLOADED=1
-            echo "✓ 下载成功"
-            break
-        else
-            echo "✗ 下载失败，尝试下一个源..."
-            rm -f "openssl-${OPENSSL_VERSION}.tar.gz"
-        fi
-    done
-    
-    if [ ${DOWNLOADED} -eq 0 ]; then
-        echo ""
-        echo "错误: 所有下载源均失败"
-        echo ""
-        echo "手动下载方案:"
-        echo "1. 在有网络的机器上下载:"
-        echo "   wget https://mirrors.tuna.tsinghua.edu.cn/openssl/source/openssl-${OPENSSL_VERSION}.tar.gz"
-        echo ""
-        echo "2. 上传到服务器 ${TEMP_DIR} 目录"
-        echo ""
-        echo "3. 重新运行此脚本"
-        exit 1
-    fi
-else
-    echo "使用已下载的文件"
-fi
+echo "从 ${SOURCE_DIR} 复制源码包..."
+cp "${SOURCE_DIR}/openssl-${OPENSSL_VERSION}.tar.gz" . || {
+    echo "错误: 复制源码包失败"
+    exit 1
+}
+echo "✓ 源码包准备完成"
 
-# 4. 解压
-echo "[4/7] 解压源码..."
-tar -xzf openssl-${OPENSSL_VERSION}.tar.gz
+# 3. 解压源码
+echo "[3/6] 解压源码..."
+
+tar -xzf openssl-${OPENSSL_VERSION}.tar.gz || {
+    echo "错误: 解压失败"
+    exit 1
+}
 cd openssl-${OPENSSL_VERSION}
+echo "✓ 解压完成"
 
-# 5. 配置和编译
-echo "[5/7] 配置编译选项..."
+# 4. 配置编译选项
+echo "[4/6] 配置编译选项..."
+echo "安装路径: ${INSTALL_PREFIX}"
+echo "配置选项: 独立安装，不影响系统 OpenSSL"
 ./config --prefix=${INSTALL_PREFIX} \
          --openssldir=${INSTALL_PREFIX} \
-         shared zlib || {
+         shared zlib \
+         no-idea no-mdc2 no-rc5 || {
     echo "错误: 配置失败"
     exit 1
 }
+echo "✓ 配置完成"
 
-echo "[6/7] 编译 OpenSSL (可能需要10-15分钟)..."
+# 5. 编译
+echo "[5/6] 编译 OpenSSL (可能需要10-15分钟)..."
 CPU_COUNT=$(nproc)
 echo "使用 ${CPU_COUNT} 个CPU核心加速编译..."
 make -j${CPU_COUNT} || {
     echo "错误: 编译失败"
     exit 1
 }
+echo "✓ 编译完成"
 
 # 6. 安装
-echo "[7/7] 安装到 ${INSTALL_PREFIX}..."
+echo "[6/6] 安装到 ${INSTALL_PREFIX}..."
 make install || {
     echo "错误: 安装失败"
     exit 1
 }
+echo "✓ 安装完成"
 
-# 7. 配置动态链接库
+# 7. 配置动态链接库（独立配置，不影响系统 OpenSSL）
 echo ""
 echo "配置动态链接库..."
 LDCONF_FILE="/etc/ld.so.conf.d/openssl3.conf"
-echo "${INSTALL_PREFIX}/lib64" > ${LDCONF_FILE}
-ldconfig
+
+# 只有当配置文件不存在或内容不同时才写入
+if [ ! -f "${LDCONF_FILE}" ] || ! grep -q "${INSTALL_PREFIX}/lib64" "${LDCONF_FILE}"; then
+    echo "${INSTALL_PREFIX}/lib64" > ${LDCONF_FILE}
+    ldconfig
+    echo "✓ 动态库配置完成"
+else
+    echo "✓ 动态库配置已存在"
+fi
+
+# 验证系统 OpenSSL 未被影响
+echo ""
+echo "验证系统 OpenSSL..."
+SYSTEM_OPENSSL=$(which openssl)
+if [ -n "${SYSTEM_OPENSSL}" ] && [ "${SYSTEM_OPENSSL}" != "${INSTALL_PREFIX}/bin/openssl" ]; then
+    SYSTEM_VERSION=$(openssl version 2>/dev/null || echo "未安装")
+    echo "✓ 系统 OpenSSL: ${SYSTEM_VERSION}"
+    echo "✓ 系统 OpenSSL 未受影响"
+fi
 
 # 8. 验证安装
 echo ""
