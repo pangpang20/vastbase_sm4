@@ -200,8 +200,8 @@ int sm2_set_private_key(sm2_context *ctx, const uint8_t *key)
         goto cleanup;
     }
     
-    /* 设置 EVP_PKEY 类型为 SM2 (关键！) */
-    EVP_PKEY_set_alias_type(pkey, EVP_PKEY_SM2);
+    /* 注意：OpenSSL 3.0 不需要显式设置 SM2 类型，
+     * 因为 EVP_PKEY_assign_EC_KEY 会保留 EC_KEY 的曲线信息 */
     
     /* 保存到上下文 */
     if (ctx->pkey) EVP_PKEY_free(ctx->pkey);
@@ -253,8 +253,8 @@ int sm2_set_public_key(sm2_context *ctx, const uint8_t *key, size_t len)
         goto cleanup;
     }
     
-    /* 设置 EVP_PKEY 类型为 SM2 (关键！) */
-    EVP_PKEY_set_alias_type(pkey, EVP_PKEY_SM2);
+    /* 注意：OpenSSL 3.0 不需要显式设置 SM2 类型，
+     * 因为 EVP_PKEY_assign_EC_KEY 会保留 EC_KEY 的曲线信息 */
     
     /* 保存到上下文 */
     if (ctx->pkey) EVP_PKEY_free(ctx->pkey);
