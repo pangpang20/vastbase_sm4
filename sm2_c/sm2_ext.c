@@ -211,8 +211,6 @@ sm2_generate_key(PG_FUNCTION_ARGS)
     char *pub_hex;
     Datum result[2];
     ArrayType *arr;
-    int dims[1] = {2};
-    int lbs[1] = {1};
     
     sm2_init(&ctx);
     
