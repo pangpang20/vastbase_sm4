@@ -111,10 +111,8 @@ void sm2_free(sm2_context *ctx)
         EVP_PKEY_free(ctx->pkey);
         ctx->pkey = NULL;
     }
-    if (ctx->ec_key) {
-        EC_KEY_free(ctx->ec_key);
-        ctx->ec_key = NULL;
-    }
+    /* 注意：ec_key 的所有权已转移给 pkey，不要再单独释放 */
+    ctx->ec_key = NULL;
     ctx->has_private_key = 0;
     ctx->has_public_key = 0;
 }
@@ -260,10 +258,10 @@ int sm2_set_private_key(sm2_context *ctx, const uint8_t *key)
     
     /* 保存到上下文 */
     if (ctx->pkey) EVP_PKEY_free(ctx->pkey);
-    if (ctx->ec_key) EC_KEY_free(ctx->ec_key);
+    /* 注意：ec_key 的所有权已转移给 pkey，不要保存到 ctx->ec_key */
     
     ctx->pkey = pkey;
-    ctx->ec_key = ec_key;
+    ctx->ec_key = NULL;  /* 不再保存，由 pkey 管理 */
     ctx->has_private_key = 1;
     ctx->has_public_key = 1;
     ec_key = NULL;  /* 防止被释放 */
