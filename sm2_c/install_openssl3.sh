@@ -60,10 +60,11 @@ fi
 
 # 1. 安装编译依赖
 echo "[1/6] 安装编译依赖..."
-yum install -y gcc make perl zlib-devel || {
+yum install -y gcc make perl perl-core perl-IPC-Cmd zlib-devel || {
     echo "错误: 安装依赖失败"
     exit 1
 }
+echo "✓ 依赖安装完成"
 
 # 2. 创建临时目录并复制源码
 echo "[2/6] 准备工作目录..."
