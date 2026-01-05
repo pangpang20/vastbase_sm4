@@ -1,14 +1,100 @@
-# VastBase2MRS SM4 国密加密解决方案
+# VastBase2MRS 国密加密解决方案
 
-本项目提供了VastBase数据库和Hive的SM4国密加解密完整解决方案，包含C语言数据库扩展和Java Hive UDF两个实现。
+本项目提供了VastBase数据库和Hive的国密加解密完整解决方案，支持SM2非对称加密、SM4对称加密，包含C语言数据库扩展和Java Hive UDF实现。
 
 ## 项目结构
 
 ```bash
 vastbase_sm4/
-├── sm4_c/          # C语言实现 - VastBase数据库扩展
+├── sm2_c/          # C语言实现 - SM2国密非对称加密扩展 (NEW)
+├── sm4_c/          # C语言实现 - SM4国密对称加密扩展
 └── sm4_java/       # Java实现 - MRS Hive UDF函数
 ```
+
+---
+
+## sm2_c - VastBase SM2数据库扩展 (NEW)
+
+**技术栈**: C语言 + PostgreSQL扩展框架
+
+**目标平台**: VastBase数据库
+
+**加密算法**: SM2国密椭圆曲线公钥密码算法（GB/T 32918-2016标准）
+
+### 主要功能
+
+- ✅ SM2密钥对生成
+- ✅ SM2公钥加密/私钥解密
+- ✅ SM2数字签名/验签
+- ✅ 支持bytea、十六进制、Base64多种格式
+- ✅ 支持自定义用户标识(ID)
+- ✅ 内置SM3哈希算法
+
+### 核心文件
+
+| 文件 | 说明 |
+|------|------|
+| `sm2.c` | SM2算法核心实现（椭圆曲线、SM3、KDF） |
+| `sm2_ext.c` | PostgreSQL扩展接口 |
+| `sm2.h` | 头文件定义 |
+| `sm2--1.0.sql` | SQL函数定义 |
+| `sm2.control` | 扩展控制文件 |
+| `Makefile` | 编译配置 |
+| `test_sm2.sql` | 测试脚本 |
+
+### 提供的SQL函数
+
+```sql
+-- 密钥管理
+sm2_c_generate_key() RETURNS text[]           -- 生成密钥对 [私钥, 公钥]
+sm2_c_get_pubkey(private_key) RETURNS text    -- 从私钥导出公钥
+
+-- 加密解密
+sm2_c_encrypt(text, public_key) RETURNS bytea
+sm2_c_decrypt(bytea, private_key) RETURNS text
+sm2_c_encrypt_hex(text, public_key) RETURNS text
+sm2_c_decrypt_hex(text, private_key) RETURNS text
+sm2_c_encrypt_base64(text, public_key) RETURNS text
+sm2_c_decrypt_base64(text, private_key) RETURNS text
+
+-- 数字签名
+sm2_c_sign(message, private_key, id) RETURNS bytea
+sm2_c_verify(message, public_key, signature, id) RETURNS boolean
+sm2_c_sign_hex(message, private_key, id) RETURNS text
+sm2_c_verify_hex(message, public_key, signature_hex, id) RETURNS boolean
+```
+
+### SM2使用示例
+
+```sql
+-- 生成密钥对
+SELECT sm2_c_generate_key() AS keypair;
+-- 结果: {私钥hex, 公钥hex}
+
+-- 加密解密
+DO $$
+DECLARE
+    keypair text[];
+    cipher text;
+BEGIN
+    keypair := sm2_c_generate_key();
+    cipher := sm2_c_encrypt_hex('敏感数据', keypair[2]);  -- 公钥加密
+    RAISE NOTICE '解密: %', sm2_c_decrypt_hex(cipher, keypair[1]);  -- 私钥解密
+END $$;
+
+-- 数字签名
+DO $$
+DECLARE
+    keypair text[];
+    signature text;
+BEGIN
+    keypair := sm2_c_generate_key();
+    signature := sm2_c_sign_hex('合同文件', keypair[1]);  -- 私钥签名
+    RAISE NOTICE '验签: %', sm2_c_verify_hex('合同文件', keypair[2], signature);  -- 公钥验签
+END $$;
+```
+
+**详细文档**: 查看 [sm2_c/README.md](sm2_c/README.md)
 
 ---
 
@@ -190,11 +276,24 @@ FROM users_encrypted;
 
 | 场景                      | 推荐方案 | 原因               |
 | ------------------------- | -------- | ------------------ |
-| VastBase/PostgreSQL数据库 | sm4_c    | 性能最优，原生支持 |
+| VastBase/PostgreSQL数据库 | sm2_c/sm4_c | 性能最优，原生支持 |
 | Hive数据仓库              | sm4_java | 大数据平台标准     |
 | Java应用集成              | sm4_java | 开发语言一致       |
 | 高性能要求                | sm4_c    | C实现性能更好      |
+| 数字签名场景              | sm2_c    | SM2支持签名       |
 | 跨平台数据交换            | 两者皆可 | 完全兼容           |
+
+### SM2 vs SM4 对比
+
+| 特性 | SM2 | SM4 |
+|------|-----|-----|
+| 算法类型 | 非对称加密 | 对称加密 |
+| 密钥 | 公钥/私钥对 | 单一密钥 |
+| 性能 | 较慢 | 较快 |
+| 密钥分发 | 公钥可公开 | 需安全传输 |
+| 适用场景 | 数字签名、密钥交换、少量数据加密 | 大量数据加密 |
+| 密钥长度 | 256位(私钥) | 128位 |
+| 数字签名 | ✅ 支持 | ✗ 不支持 |
 
 ---
 
@@ -252,6 +351,7 @@ SELECT sm4_decrypt_ecb('base64_of_a1b2c3d4e5f6...', 'mykey12345678901');
 
 ---
 
-**最后更新**: 2025-12-24  
-**版本**: 1.0.0  
+**最后更新**: 2026-01-05  
+**版本**: 1.1.0  
 **维护者**: 陈云亮 <676814828@qq.com>
+

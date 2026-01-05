@@ -1,0 +1,5 @@
+# SM2 extension
+comment = 'SM2 elliptic curve cryptography functions (Chinese National Standard GB/T 32918)'
+default_version = '1.0'
+module_pathname = '$libdir/sm2'
+relocatable = true
