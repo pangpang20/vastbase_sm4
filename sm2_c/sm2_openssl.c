@@ -123,6 +123,7 @@ int sm2_generate_keypair(sm2_context *ctx)
 {
     EVP_PKEY_CTX *pctx = NULL;
     EVP_PKEY *pkey = NULL;
+    EC_KEY *ec_key = NULL;
     int ret = -1;
     
     /* 创建密钥生成上下文 */
@@ -139,7 +140,7 @@ int sm2_generate_keypair(sm2_context *ctx)
     if (EVP_PKEY_keygen(pctx, &pkey) <= 0) goto cleanup;
     
     /* 提取 EC_KEY */
-    EC_KEY *ec_key = EVP_PKEY_get1_EC_KEY(pkey);
+    ec_key = EVP_PKEY_get1_EC_KEY(pkey);
     if (!ec_key) goto cleanup;
     
     /* 保存到上下文 */
@@ -151,11 +152,13 @@ int sm2_generate_keypair(sm2_context *ctx)
     ctx->has_private_key = 1;
     ctx->has_public_key = 1;
     pkey = NULL;  /* 防止被释放 */
+    ec_key = NULL;
     ret = 0;
     
 cleanup:
     if (pctx) EVP_PKEY_CTX_free(pctx);
     if (pkey) EVP_PKEY_free(pkey);
+    if (ec_key) EC_KEY_free(ec_key);
     return ret;
 }
 
@@ -165,6 +168,7 @@ int sm2_set_private_key(sm2_context *ctx, const uint8_t *key)
     BIGNUM *priv_bn = NULL;
     const EC_GROUP *group;
     EC_POINT *pub_point = NULL;
+    EVP_PKEY *pkey = NULL;
     int ret = -1;
     
     /* 创建 SM2 密钥 */
@@ -187,11 +191,12 @@ int sm2_set_private_key(sm2_context *ctx, const uint8_t *key)
     if (!EC_KEY_set_public_key(ec_key, pub_point)) goto cleanup;
     
     /* 创建 EVP_PKEY */
-    EVP_PKEY *pkey = EVP_PKEY_new();
+    pkey = EVP_PKEY_new();
     if (!pkey) goto cleanup;
     
     if (!EVP_PKEY_assign_EC_KEY(pkey, ec_key)) {
         EVP_PKEY_free(pkey);
+        pkey = NULL;
         goto cleanup;
     }
     
@@ -204,12 +209,14 @@ int sm2_set_private_key(sm2_context *ctx, const uint8_t *key)
     ctx->has_private_key = 1;
     ctx->has_public_key = 1;
     ec_key = NULL;  /* 防止被释放 */
+    pkey = NULL;
     ret = 0;
     
 cleanup:
     if (priv_bn) BN_free(priv_bn);
     if (pub_point) EC_POINT_free(pub_point);
     if (ec_key) EC_KEY_free(ec_key);
+    if (pkey) EVP_PKEY_free(pkey);
     return ret;
 }
 
@@ -218,6 +225,7 @@ int sm2_set_public_key(sm2_context *ctx, const uint8_t *key, size_t len)
     EC_KEY *ec_key = NULL;
     EC_POINT *point = NULL;
     const EC_GROUP *group;
+    EVP_PKEY *pkey = NULL;
     int ret = -1;
     
     /* 创建 SM2 密钥 */
@@ -233,11 +241,12 @@ int sm2_set_public_key(sm2_context *ctx, const uint8_t *key, size_t len)
     if (!EC_KEY_set_public_key(ec_key, point)) goto cleanup;
     
     /* 创建 EVP_PKEY */
-    EVP_PKEY *pkey = EVP_PKEY_new();
+    pkey = EVP_PKEY_new();
     if (!pkey) goto cleanup;
     
     if (!EVP_PKEY_assign_EC_KEY(pkey, ec_key)) {
         EVP_PKEY_free(pkey);
+        pkey = NULL;
         goto cleanup;
     }
     
@@ -249,11 +258,13 @@ int sm2_set_public_key(sm2_context *ctx, const uint8_t *key, size_t len)
     ctx->ec_key = ec_key;
     ctx->has_public_key = 1;
     ec_key = NULL;  /* 防止被释放 */
+    pkey = NULL;
     ret = 0;
     
 cleanup:
     if (point) EC_POINT_free(point);
     if (ec_key) EC_KEY_free(ec_key);
+    if (pkey) EVP_PKEY_free(pkey);
     return ret;
 }
 

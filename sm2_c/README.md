@@ -77,6 +77,7 @@ sm2_c/
 
 ```bash
 # 使用一键安装脚本
+# 切换用户 root
 cd /path/to/vastbase_sm4/sm2_c
 sudo bash install_openssl3.sh
 
@@ -87,6 +88,7 @@ sudo bash install_openssl3.sh
 
 ```bash
 # 进入代码目录
+# 切换数据库安装用户
 su - vastbase
 cd /home/vastbase/vastbase_sm4/sm2_c
 
