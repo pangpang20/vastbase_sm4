@@ -366,7 +366,7 @@ sm2_decrypt_hex(PG_FUNCTION_ARGS)
                  errmsg("Invalid hex ciphertext")));
     }
     
-    plain_len = cipher_len;
+    plain_len = cipher_len + 1;  /* +1 为结束符预留空间 */
     plain = (uint8_t *)palloc(plain_len);
     
     if (sm2_decrypt(priv_key, cipher, cipher_len, plain, &plain_len) != 0) {
@@ -378,7 +378,7 @@ sm2_decrypt_hex(PG_FUNCTION_ARGS)
                  errmsg("SM2 decryption failed")));
     }
     
-    plain[plain_len] = '\0';
+    plain[plain_len] = '\0';  /* 现在安全了 */
     result = cstring_to_text((char *)plain);
     pfree(cipher_str);
     pfree(cipher);
@@ -467,7 +467,7 @@ sm2_decrypt_base64(PG_FUNCTION_ARGS)
                  errmsg("Invalid base64 ciphertext")));
     }
     
-    plain_len = cipher_len;
+    plain_len = cipher_len + 1;  /* +1 为结束符预留空间 */
     plain = (uint8_t *)palloc(plain_len);
     
     if (sm2_decrypt(priv_key, cipher, cipher_len, plain, &plain_len) != 0) {
@@ -479,7 +479,7 @@ sm2_decrypt_base64(PG_FUNCTION_ARGS)
                  errmsg("SM2 decryption failed")));
     }
     
-    plain[plain_len] = '\0';
+    plain[plain_len] = '\0';  /* 现在安全了 */
     result = cstring_to_text((char *)plain);
     pfree(cipher_str);
     pfree(cipher);
@@ -559,7 +559,7 @@ sm2_decrypt_func(PG_FUNCTION_ARGS)
     cipher_len = VARSIZE(ciphertext) - VARHDRSZ;
     cipher = (uint8_t *)VARDATA(ciphertext);
     
-    plain_len = cipher_len;
+    plain_len = cipher_len + 1;  /* +1 为结束符预留空间 */
     plain = (uint8_t *)palloc(plain_len);
     
     if (sm2_decrypt(priv_key, cipher, cipher_len, plain, &plain_len) != 0) {
@@ -569,7 +569,7 @@ sm2_decrypt_func(PG_FUNCTION_ARGS)
                  errmsg("SM2 decryption failed")));
     }
     
-    plain[plain_len] = '\0';
+    plain[plain_len] = '\0';  /* 现在安全了 */
     result = cstring_to_text((char *)plain);
     pfree(plain);
     

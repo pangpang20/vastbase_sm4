@@ -191,10 +191,10 @@ vsql -d test01 -f /home/vastbase/vasthome/share/postgresql/extension/sm2--1.0.sq
 SELECT sm2_c_generate_key() AS keypair;
 
 -- 结果示例:
--- {3f49c0e88e8e3c9e4c3e3f8a9e5d6c7b8a9e3f4c5d6e7f8a9b0c1d2e3f4a5b6c, a1b2c3d4...128字符公钥...}
+-- {56341526383e7547383abf6f4f6460e9b8b964559ca258c1fda565abdbcdd059,105ec51d5031d264b3956c91338060ecfea660f31ac841b9b34aa8e1659487b6bf5dee288eeb3db61d8f38b2fa82be2b7c8cfcbb29fecee8e8c1b7eab727e3af}
 
 -- 从私钥导出公钥
-SELECT sm2_c_get_pubkey('3f49c0e88e8e3c9e4c3e3f8a9e5d6c7b8a9e3f4c5d6e7f8a9b0c1d2e3f4a5b6c');
+SELECT sm2_c_get_pubkey('56341526383e7547383abf6f4f6460e9b8b964559ca258c1fda565abdbcdd059');
 ```
 
 ### 2. 加密解密
