@@ -737,7 +737,7 @@ static int derive_key_and_iv_dws(
     unsigned char hash_output[EVP_MAX_MD_SIZE];
     unsigned int hash_len;
     EVP_MD_CTX *ctx = NULL;
-    int mode = 3;  /* 切换到模式3：直接使用password */
+    int mode = 2;  /* 切换到模式2：hash(salt + password) */
     
     /* 选择哈希算法 */
     if (strcmp(hash_algo, "sha256") == 0) {
