@@ -125,10 +125,8 @@ END $$;
 | `sm4.h`                       | 头文件定义                 |
 | `sm4--1.0.sql`                | SQL函数定义                |
 | `sm4.control`                 | 扩展控制文件               |
-| `Makefile`                    | 编译配置（启用OpenSSL KDF） |
+| `Makefile`                    | 编译配置               |
 | `test_sm4.sql`                | ECB/CBC测试脚本            |
-| `test_sm4_cbc_kdf.sql` 🔥     | CBC KDF测试脚本            |
-| `test_sm4_gs_compat.sql` 🎯   | GS格式兼容性测试脚本   |
 
 ### 提供的SQL函数
 
@@ -144,17 +142,6 @@ sm4_c_decrypt_hex(text, text) RETURNS text
 -- CBC模式
 sm4_c_encrypt_cbc(text, text, text) RETURNS bytea
 sm4_c_decrypt_cbc(bytea, text, text) RETURNS text
-
--- 🔥 CBC+KDF模式（密钥派生）
-sm4_c_encrypt_cbc_kdf(text, password, hash_algo) RETURNS bytea
-sm4_c_decrypt_cbc_kdf(bytea, password, hash_algo) RETURNS text
-  -- hash_algo: 'sha256' | 'sha384' | 'sha512' | 'sm3'
-  -- 使用PBKDF2从密码派生密钥和IV（8,192次迭代）
-  -- 自动生成随机盐值，无需手动管理密钥/IV
-
--- 🎯 兼容DWS gs_encrypt格式
-sm4_c_encrypt_cbc_gs(text, password, hash_algo) RETURNS text  -- Base64
-sm4_c_decrypt_cbc_gs(text, password, hash_algo) RETURNS text  -- 需指定算法
 
 -- GCM模式（认证加密）
 sm4_c_encrypt_gcm(text, key, iv, aad) RETURNS bytea
@@ -175,38 +162,8 @@ SELECT sm4_c_decrypt_hex('encrypted_hex_string', 'mykey12345678901') AS phone;
 -- CBC模式加密（更安全）
 SELECT sm4_c_encrypt_cbc('sensitive data', 'mykey12345678901', '1234567890abcdef');
 
--- 🔥 CBC+KDF模式（密钥派生，不需管理IV）
--- SHA256加密解密
-SELECT sm4_c_decrypt_cbc_kdf(
-    sm4_c_encrypt_cbc_kdf('Hello World!', 'mypassword', 'sha256'),
-    'mypassword',
-    'sha256'
-);
-
--- SHA384加密解密
-SELECT sm4_c_decrypt_cbc_kdf(
-    sm4_c_encrypt_cbc_kdf('Secret Data', 'strongpass', 'sha384'),
-    'strongpass',
-    'sha384'
-);
-
--- SM3国密哈希加密解密（OpenSSL 3.0+）
-SELECT sm4_c_decrypt_cbc_kdf(
-    sm4_c_encrypt_cbc_kdf('国密测试', '中文密码', 'sm3'),
-    '中文密码',
-    'sm3'
-);
-
--- 🎯 GS格式兼容示例
--- 加密（生成DWS gs_encrypt格式）
-SELECT sm4_c_encrypt_cbc_gs('Hello World!', '1234567890123456', 'sha256');
-
--- 解密DWS gs_encrypt加密的数据
-SELECT sm4_c_decrypt_cbc_gs(
-    'AwAAAAAAAAChP0tyh4nwLniN0WHlBFRMPD0qMvXaiNiZbvg/scBf48YKuse1HhuqmUy91ZVEGGzWBt1D1IHRHRTgSjbgCDG7s8lBRwo06umf4qKLufbp0Q==',
-    '1234567890123456',
-    'sha256'
-);
+-- GCM模式加密（带认证）
+SELECT sm4_c_encrypt_gcm('secret message', 'mykey12345678901', '123456789012', 'additional data');
 ```
 
 ### C扩展应用场景
@@ -215,9 +172,7 @@ SELECT sm4_c_decrypt_cbc_gs(
 - ✅ 敏感信息保护（手机号、身份证等）
 - ✅ 数据脱敏查询
 - ✅ 政务系统数据安全
-- 🔥 **基于密码的加密（使用KDF）**
-- 🔥 **多哈希算法支持（SHA256/384/512/SM3）**
-- 🎯 **与DWS gs_encrypt函数互操作**
+- ✅ GCM模式认证加密
 
 **详细文档**: 查看 [sm4_c/README.md](sm4_c/README.md)
 
@@ -375,29 +330,26 @@ export SM4_KEY="your_secret_key"
 
 - **16字节字符串**: `"mykey12345678901"` (推荐)
 - **32位十六进制**: `"6d796b657931323334353637383930"`
-- 🔥 **KDF密码模式**: 任意长度密码，自动派生密钥
 
 ```sql
 -- 标准模式：需要固定长度密钥
 SELECT sm4_c_encrypt_cbc('data', 'mykey12345678901', '1234567890abcdef');
-
--- 🔥 KDF模式：任意密码长度，自动派生
-SELECT sm4_c_encrypt_cbc_kdf('data', 'any_length_password_here', 'sha256');
 ```
 
 ### 3. 加密模式选择
 
 - **ECB模式**: 简单快速，适合独立字段加密
 - **CBC模式**: 更安全，适合大数据或高安全要求场景
-- 🔥 **CBC+KDF模式**: 基于密码，自动密钥管理，最安全
+- **GCM模式**: 认证加密，最高安全性
 
-| 特性 | ECB | CBC | CBC+KDF 🔥 |
-|------|-----|-----|-------------|
+| 特性 | ECB | CBC | GCM |
+|------|-----|-----|-----|
 | 安全性 | 低 | 高 | **最高** |
-| 性能 | 快 | 中 | 中（PBKDF2） |
-| IV管理 | 无 | 手动 | **自动** |
-| 密钥要求 | 16字节 | 16字节 | **任意长度** |
-| 适用场景 | 简单加密 | 通用加密 | **密码加密** |
+| 性能 | 快 | 中 | 中 |
+| IV管理 | 无 | 手动 | 手动 |
+| 认证 | 无 | 无 | **自动** |
+| 密钥要求 | 16字节 | 16字节 | 16字节 |
+| 适用场景 | 简单加密 | 通用加密 | **高安全加密** |
 
 ### 4. 访问控制
 

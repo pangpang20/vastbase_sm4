@@ -10,11 +10,9 @@
 ├── sm4_ext.c                  # VastBase扩展接口
 ├── sm4.control                # 扩展控制文件
 ├── sm4--1.0.sql               # SQL函数定义
-├── Makefile                   # 编译配置（已启用OpenSSL KDF支持）
+├── Makefile                   # 编译配置
 ├── test_sm4.sql               # ECB/CBC测试脚本
 ├── test_sm4_gcm.sql           # GCM模式测试脚本
-├── test_sm4_cbc_kdf.sql       # CBC KDF模式测试脚本
-├── test_sm4_gs_compat.sql     # GS格式兼容性测试脚本
 ├── demo_citizen_data.sql      # 示例数据
 └── README.md                  # 使用文档（本文件）
 ```
@@ -44,7 +42,7 @@ export VBHOME=/home/vastbase/vasthome # 根据实际调整
 export PATH=$VBHOME/bin:$PATH
 export LD_LIBRARY_PATH=$VBHOME/lib:$LD_LIBRARY_PATH
 
-# 编译（已启用 OpenSSL KDF 支持）
+# 编译（需要OpenSSL支持）
 make clean
 make
 
@@ -131,8 +129,6 @@ DROP FUNCTION IF EXISTS sm4_c_encrypt_cbc(text, text, text);
 DROP FUNCTION IF EXISTS sm4_c_decrypt_cbc(bytea, text, text);
 DROP FUNCTION IF EXISTS sm4_c_encrypt_gcm(text, text, text, text);
 DROP FUNCTION IF EXISTS sm4_c_decrypt_gcm(bytea, text, text, text);
-DROP FUNCTION IF EXISTS sm4_c_encrypt_cbc_kdf(text, text, text);
-DROP FUNCTION IF EXISTS sm4_c_decrypt_cbc_kdf(bytea, text, text);
 ```
 
 **注意**：
@@ -170,10 +166,6 @@ vsql -d test01
 | `sm4_c_decrypt_hex(hex, key)`                  | ECB模式解密，输入十六进制密文     |
 | `sm4_c_encrypt_cbc(text, key, iv)`             | CBC模式加密，返回bytea            |
 | `sm4_c_decrypt_cbc(bytea, key, iv)`            | CBC模式解密，返回text             |
-| `sm4_c_encrypt_cbc_kdf(text, password, algo)`  | **CBC+KDF加密**，支持密钥派生 🔥  |
-| `sm4_c_decrypt_cbc_kdf(bytea, password, algo)` | **CBC+KDF解密**，支持密钥派生 🔥  |
-| `sm4_c_encrypt_cbc_gs(text, password, algo)`   | **兼容DWS gs_encrypt格式加密** 🎯     |
-| `sm4_c_decrypt_cbc_gs(text, password, algo)`   | **兼容DWS gs_encrypt格式解密** 🎯     |
 | `sm4_c_encrypt_gcm(text, key, iv, aad)`        | GCM模式加密，返回密文+Tag(bytea)  |
 | `sm4_c_decrypt_gcm(bytea, key, iv, aad)`       | GCM模式解密，返回text             |
 | `sm4_c_encrypt_gcm_base64(text, key, iv, aad)` | GCM模式加密，返回Base64编码(text) |
@@ -185,89 +177,6 @@ vsql -d test01
 
 - CBC模式: 16字节字符串 或 32位十六进制字符串
 - GCM模式: 12或16字节字符串 或 24/32位十六进制字符串（推荐12字节）
-
-### 🔥 新增：CBC KDF（密钥派生）模式
-
-**特性**：
-- ✅ 使用 PBKDF2 从密码派生密钥和IV（8,192次迭代）
-- ✅ 支持 SHA256/SHA384/SHA512/SM3 哈希算法
-- ✅ 自动生成随机盐值，增强安全性
-- ✅ 无需手动管理密钥和IV，简化使用
-
-**参数说明**：
-- `password`: 任意长度的密码（text）
-- `hash_algo`: 哈希算法，可选值：
-  - `'sha256'` - SHA-256（推荐，OpenSSL 1.1.1+）
-  - `'sha384'` - SHA-384（OpenSSL 1.1.1+）
-  - `'sha512'` - SHA-512（OpenSSL 1.1.1+）
-  - `'sm3'` - SM3 国密哈希（需要 OpenSSL 3.0+）
-
-**输出格式**：`[盐值 16字节] + [SM4 CBC 密文]`
-
-### ❓ 常见问题
-
-**Q1: SM3 算法不可用怎么办？**
-- 需要 OpenSSL 3.0+ 或 GmSSL
-- 检查: `openssl version`
-- 如果版本较低，使用 SHA256/384/512 替代
-
-**Q2: 密钥派生性能影响？**
-- PBKDF2 8,192 次迭代约需 5-30ms
-- 比标准 CBC 慢约 5-15 倍
-- 适合需要密码保护的场景
-
-**Q3: 为什么每次加密结果不同？**
-- 因为每次生成的随机盐值不同
-- 这是安全特性，防止彩虹表攻击
-
-### 🎯 新增：兼容 DWS gs_encrypt 格式
-
-**特性**：
-- ✅ 完全兼容 DWS `gs_encrypt` 函数格式
-- ✅ 支持 SHA256/SHA384/SHA512/SM3 哈希算法
-- ✅ Base64 编码输出，与数据库一致
-- ✅ 需要明确指定哈希算法（DWS不在数据中存储）
-- ✅ 可解密 DWS `gs_encrypt` 加密的数据
-
-**函数说明**：
-```sql
--- 加密（需指定哈希算法）
-sm4_c_encrypt_cbc_gs(plaintext, password, hash_algo) -> text (Base64)
-
--- 解密（也需指定哈希算法）
-sm4_c_decrypt_cbc_gs(ciphertext_base64, password, hash_algo) -> text
-```
-
-**数据格式**：
-```
-Base64([版本号 1字节] + [保留 7字节] + [盐值 16字节] + [密文])
-
-版本号: 0x03
-保留字段: 全零 (DWS不在数据中存储哈希算法类型)
-```
-
-**使用示例**：
-```sql
--- 使用 GS 格式加密
-SELECT sm4_c_encrypt_cbc_gs('Hello World!', '1234567890123456', 'sha256');
--- 输出: AwAAAAAAAA... (Base64)
-
--- 解密 GS 格式数据（需指定哈希算法）
-SELECT sm4_c_decrypt_cbc_gs(
-    'AwAAAAAAAAChP0tyh4nwLniN0WHlBFRMPD0qMvXaiNiZbvg/scBf48YKuse1HhuqmUy91ZVEGGzWBt1D1IHRHRTgSjbgCDG7s8lBRwo06umf4qKLufbp0Q==',
-    '1234567890123456',
-    'sha256'
-);
-
--- 加解密验证
-SELECT sm4_c_decrypt_cbc_gs(
-    sm4_c_encrypt_cbc_gs('Test Data', 'password', 'sha256'),
-    'password',
-    'sha256'
-);
-```
-
-**测试脚本**：`test_sm4_gs_compat.sql`
 
 ## 运行示例
 
@@ -349,86 +258,25 @@ SELECT sm4_c_decrypt_gcm_base64(
 );
 -- 返回: Test Data
 
--- 🔥 CBC KDF 模式示例（带密钥派生）
--- SHA256 加密解密
-SELECT sm4_c_decrypt_cbc_kdf(
-    sm4_c_encrypt_cbc_kdf('Hello World!', 'mypassword', 'sha256'),
-    'mypassword',
-    'sha256'
-);
-
--- SHA384 加密解密
-SELECT sm4_c_decrypt_cbc_kdf(
-    sm4_c_encrypt_cbc_kdf('Secret Message', 'strongpass', 'sha384'),
-    'strongpass',
-    'sha384'
-);
-
--- SHA512 加密解密
-SELECT sm4_c_decrypt_cbc_kdf(
-    sm4_c_encrypt_cbc_kdf('Confidential', 'p@ssw0rd', 'sha512'),
-    'p@ssw0rd',
-    'sha512'
-);
-
--- SM3 加密解密（需要 OpenSSL 3.0+）
-SELECT sm4_c_decrypt_cbc_kdf(
-    sm4_c_encrypt_cbc_kdf('国密测试', '中文密码', 'sm3'),
-    '中文密码',
-    'sm3'
-);
-
--- 查看加密后的十六进制（每次不同，因为盐值随机）
-SELECT encode(sm4_c_encrypt_cbc_kdf('Test', 'password', 'sha256'), 'hex');
-
 -- 运行测试脚本
 vsql -d test01 -f test_sm4.sql
 
 vsql -d test01 -f test_sm4_gcm.sql
-
-vsql -d test01 -f test_sm4_cbc_kdf.sql  -- KDF模式测试
-
-vsql -d test01 -f test_sm4_gs_compat.sql  -- GS格式兼容性测试
 
 vsql -d test01 -f demo_citizen_data.sql
 ```
 
 ## 加密模式对比
 
-| 特性 | 标准 CBC | CBC KDF（密钥派生） | CBC GS（兼容格式） |
-|------|---------|--------------------|--------------------|
-| 密钥输入 | 16字节固定密钥 | 任意长度密码 | 任意长度密码 |
-| IV管理 | 手动提供16字节IV | 自动派生 | 自动派生 |
-| 盐值 | 无 | 自动生成并包含在输出 | 自动生成并包含在输出 |
-| 密钥强化 | 无 | PBKDF2 8,192次迭代 | PBKDF2 8,192次迭代 |
-| 输出格式 | bytea | bytea | Base64 text |
-| 元数据 | 无 | 仅盐值 | 版本+算法+盐值 |
-| 兼容性 | 标准实现 | 开源标准 | **DWS 兼容** |
-| 安全性 | 依赖密钥管理 | 密码派生增强 | 密码派生增强 |
-| 适用场景 | 密钥已安全管理 | 基于密码的加密 | **与DWS gs_encrypt互操作** |
-| 使用示例 | `sm4_c_encrypt_cbc()` | `sm4_c_encrypt_cbc_kdf()` | `sm4_c_encrypt_cbc_gs()` |
+| 特性 | ECB模式 | 标准CBC模式 | GCM模式 |
+|------|---------|------------|--------|
+| 密钥输入 | 16字节固定密钥 | 16字节固定密钥 | 16字节固定密钥 |
+| IV管理 | 无 | 手动提供16字节IV | 手动提供12/16字节IV |
+| 认证 | 无 | 无 | 自动认证（Tag） |
+| 安全性 | 较低（不推荐） | 中等 | 高（推荐） |
+| 适用场景 | 简单场景 | 密钥已安全管理 | 需要认证的场景 |
+| 使用示例 | `sm4_c_encrypt()` | `sm4_c_encrypt_cbc()` | `sm4_c_encrypt_gcm()` |
 
 ## 注意事项
 
-1. **OpenSSL 版本要求**：
-   - SHA256/384/512: OpenSSL 1.1.1+
-   - SM3: OpenSSL 3.0+（或 GmSSL）
-
-2. **性能考虑**：
-   - KDF 版本因 PBKDF2 迭代会比标准版本慢
-   - 适合需要密码保护的场景
-
-3. **向后兼容**：
-   - 所有原有函数保持不变
-   - 新函数使用 `_kdf` 后缀
-
-```
-
-测试结果1：
-![alt text](image-2.png)
-
-测试结果2：
-![alt text](image.png)
-
-测试结果3：
-![alt text](image-1.png)
+1. **密钥安全**：密钥应妥善保管，不要硬编码在代码中

@@ -91,38 +91,3 @@ LANGUAGE C IMMUTABLE;
 COMMENT ON FUNCTION sm4_c_decrypt_gcm_base64(text, text, text, text) IS 
 'SM4 GCM模式解密(C扩展)，接收Base64编码。参数: ciphertext_base64-Base64编码的密文+Tag, key-密钥, iv-初始向量(12或16字节，或24/32位十六进制，必须与加密时相同), aad-附加认证数据(可选)。返回明文。';
 
--- CBC模式加密（带密钥派生）- C扩展版本
-CREATE OR REPLACE FUNCTION sm4_c_encrypt_cbc_kdf(plaintext text, password text, hash_algo text)
-RETURNS bytea
-AS 'sm4', 'sm4_encrypt_cbc_kdf'
-LANGUAGE C STRICT IMMUTABLE;
-
-COMMENT ON FUNCTION sm4_c_encrypt_cbc_kdf(text, text, text) IS 
-'SM4 CBC模式加密(C扩展)，带密钥派生。参数: plaintext-明文, password-密码, hash_algo-哈希算法(sha256/sha384/sha512/sm3)。返回salt+密文(bytea)。使用PBKDF2派生密钥和IV，盐值随机生成。';
-
--- CBC模式解密（带密钥派生）- C扩展版本
-CREATE OR REPLACE FUNCTION sm4_c_decrypt_cbc_kdf(ciphertext bytea, password text, hash_algo text)
-RETURNS text
-AS 'sm4', 'sm4_decrypt_cbc_kdf'
-LANGUAGE C STRICT IMMUTABLE;
-
-COMMENT ON FUNCTION sm4_c_decrypt_cbc_kdf(bytea, text, text) IS 
-'SM4 CBC模式解密(C扩展)，带密钥派生。参数: ciphertext-密文(包含salt+密文的bytea), password-密码, hash_algo-哈希算法(sha256/sha384/sha512/sm3)。返回明文。使用PBKDF2从密码和盐值派生密钥和IV。';
-
--- CBC模式加密（兼容gs_encrypt格式）- C扩展版本
-CREATE OR REPLACE FUNCTION sm4_c_encrypt_cbc_gs(plaintext text, password text, hash_algo text)
-RETURNS text
-AS 'sm4', 'sm4_encrypt_cbc_gs'
-LANGUAGE C STRICT IMMUTABLE;
-
-COMMENT ON FUNCTION sm4_c_encrypt_cbc_gs(text, text, text) IS 
-'SM4 CBC模式加密(C扩展)，兼容gs_encrypt格式。参数: plaintext-明文, password-密码, hash_algo-哈希算法(sha256/sha384/sha512/sm3)。返回Base64编码的加密数据，格式与DWS gs_encrypt兼容。包含版本号+算法标识+盐值+密文。';
-
--- CBC模式解密（兼容gs_encrypt格式）- C扩展版本
-CREATE OR REPLACE FUNCTION sm4_c_decrypt_cbc_gs(ciphertext text, password text, hash_algo text)
-RETURNS text
-AS 'sm4', 'sm4_decrypt_cbc_gs'
-LANGUAGE C STRICT IMMUTABLE;
-
-COMMENT ON FUNCTION sm4_c_decrypt_cbc_gs(text, text, text) IS 
-'SM4 CBC模式解密(C扩展)，兼容gs_encrypt格式。参数: ciphertext-Base64编码的密文(gs_encrypt格式), password-密码, hash_algo-哈希算法(sha256/sha384/sha512/sm3)。返回明文。兼容DWS gs_encrypt加密的数据。';
