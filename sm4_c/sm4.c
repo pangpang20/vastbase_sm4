@@ -9,6 +9,12 @@
 #include <string.h>
 #include <stdlib.h>
 
+#ifdef USE_OPENSSL_KDF
+#include <openssl/evp.h>
+#include <openssl/rand.h>
+#include <openssl/kdf.h>
+#endif
+
 /* SM4 S盒 */
 static const uint8_t SM4_SBOX[256] = {
     0xd6, 0x90, 0xe9, 0xfe, 0xcc, 0xe1, 0x3d, 0xb7, 0x16, 0xb6, 0x14, 0xc2, 0x28, 0xfb, 0x2c, 0x05,
@@ -658,3 +664,163 @@ int sm4_gcm_decrypt(const uint8_t *key, const uint8_t *iv, size_t iv_len,
 
     return 0;
 }
+
+#ifdef USE_OPENSSL_KDF
+/*
+ * 使用PBKDF2派生密钥和IV
+ */
+static int derive_key_and_iv(
+    const uint8_t *password,
+    size_t password_len,
+    const uint8_t *salt,
+    size_t salt_len,
+    const char *hash_algo,
+    uint8_t *key,
+    uint8_t *iv)
+{
+    const EVP_MD *md = NULL;
+    uint8_t derived[32];  /* 16字节密钥 + 16字节IV */
+    int iterations = 10000;  /* PBKDF2迭代次数 */
+
+    /* 选择哈希算法 */
+    if (strcmp(hash_algo, "sha256") == 0) {
+        md = EVP_sha256();
+    } else if (strcmp(hash_algo, "sha384") == 0) {
+        md = EVP_sha384();
+    } else if (strcmp(hash_algo, "sha512") == 0) {
+        md = EVP_sha512();
+    } else if (strcmp(hash_algo, "sm3") == 0) {
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+        md = EVP_sm3();
+#else
+        return -1;  /* OpenSSL < 3.0 不支持SM3 */
+#endif
+    } else {
+        return -1;  /* 不支持的哈希算法 */
+    }
+
+    /* 使用PBKDF2派生密钥材料 */
+    if (PKCS5_PBKDF2_HMAC(
+            (const char *)password, password_len,
+            salt, salt_len,
+            iterations,
+            md,
+            32,  /* 输出32字节：16字节密钥 + 16字节IV */
+            derived) != 1) {
+        return -1;
+    }
+
+    /* 分离密钥和IV */
+    memcpy(key, derived, 16);
+    memcpy(iv, derived + 16, 16);
+
+    /* 清理敏感数据 */
+    memset(derived, 0, sizeof(derived));
+
+    return 0;
+}
+
+/*
+ * SM4 CBC模式加密（带密钥派生）
+ * 输出格式: salt[16] + ciphertext
+ */
+int sm4_cbc_encrypt_kdf(
+    const uint8_t *password,
+    size_t password_len,
+    const char *hash_algo,
+    const uint8_t *input,
+    size_t input_len,
+    uint8_t *output,
+    size_t *output_len)
+{
+    uint8_t salt[16];
+    uint8_t key[SM4_KEY_SIZE];
+    uint8_t iv[SM4_BLOCK_SIZE];
+    size_t cipher_len;
+    int ret;
+
+    if (!password || !hash_algo || !input || !output || !output_len) {
+        return -1;
+    }
+
+    /* 生成随机盐值 */
+    if (RAND_bytes(salt, sizeof(salt)) != 1) {
+        return -1;
+    }
+
+    /* 派生密钥和IV */
+    if (derive_key_and_iv(password, password_len, salt, sizeof(salt),
+                          hash_algo, key, iv) != 0) {
+        return -1;
+    }
+
+    /* 存储盐值到输出缓冲区 */
+    memcpy(output, salt, sizeof(salt));
+
+    /* 使用标准CBC加密 */
+    ret = sm4_cbc_encrypt(key, iv, input, input_len,
+                          output + sizeof(salt), &cipher_len);
+
+    /* 清理敏感数据 */
+    memset(key, 0, sizeof(key));
+    memset(iv, 0, sizeof(iv));
+
+    if (ret != 0) {
+        return -1;
+    }
+
+    *output_len = sizeof(salt) + cipher_len;
+    return 0;
+}
+
+/*
+ * SM4 CBC模式解密（带密钥派生）
+ * 输入格式: salt[16] + ciphertext
+ */
+int sm4_cbc_decrypt_kdf(
+    const uint8_t *password,
+    size_t password_len,
+    const char *hash_algo,
+    const uint8_t *input,
+    size_t input_len,
+    uint8_t *output,
+    size_t *output_len)
+{
+    uint8_t key[SM4_KEY_SIZE];
+    uint8_t iv[SM4_BLOCK_SIZE];
+    const uint8_t *salt;
+    const uint8_t *ciphertext;
+    size_t cipher_len;
+    int ret;
+
+    if (!password || !hash_algo || !input || !output || !output_len) {
+        return -1;
+    }
+
+    /* 输入必须至少包含盐值 */
+    if (input_len < 16) {
+        return -1;
+    }
+
+    /* 提取盐值和密文 */
+    salt = input;
+    ciphertext = input + 16;
+    cipher_len = input_len - 16;
+
+    /* 派生密钥和IV */
+    if (derive_key_and_iv(password, password_len, salt, 16,
+                          hash_algo, key, iv) != 0) {
+        return -1;
+    }
+
+    /* 使用标准CBC解密 */
+    ret = sm4_cbc_decrypt(key, iv, ciphertext, cipher_len,
+                          output, output_len);
+
+    /* 清理敏感数据 */
+    memset(key, 0, sizeof(key));
+    memset(iv, 0, sizeof(iv));
+
+    return ret;
+}
+#endif /* USE_OPENSSL_KDF */

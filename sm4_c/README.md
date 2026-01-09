@@ -5,19 +5,33 @@
 ## 文件结构
 
 ```text
-├── sm4.h               # SM4算法头文件
-├── sm4.c               # SM4算法实现
-├── sm4_ext.c           # VastBase扩展接口
-├── sm4.control         # 扩展控制文件
-├── sm4--1.0.sql        # SQL函数定义
-├── Makefile            # 编译配置
-├── test_sm4.sql        # 测试脚本
-├── test_sm4_gcm.sql    # GCM模式测试脚本
-├── demo_citizen_data.sql # 示例数据
-└── README.md           # 使用文档（包含GCM模式详细说明）
+├── sm4.h                      # SM4算法头文件
+├── sm4.c                      # SM4算法实现
+├── sm4_ext.c                  # VastBase扩展接口
+├── sm4.control                # 扩展控制文件
+├── sm4--1.0.sql               # SQL函数定义
+├── Makefile                   # 编译配置（已启用OpenSSL KDF支持）
+├── test_sm4.sql               # ECB/CBC测试脚本
+├── test_sm4_gcm.sql           # GCM模式测试脚本
+├── test_sm4_cbc_kdf.sql       # CBC KDF模式测试脚本
+├── demo_citizen_data.sql      # 示例数据
+├── README.md                  # 使用文档（本文件）
+├── USAGE_KDF.md               # KDF功能详细使用指南
+└── IMPLEMENTATION_SUMMARY.md  # KDF实现总结
 ```
 
 ## 编译安装
+
+**前置条件**: 需要安装 OpenSSL 开发库（1.1.1+ 或 3.0+）
+
+```bash
+# 检查 OpenSSL 版本
+openssl version
+
+# 如果需要安装 OpenSSL 开发库
+# CentOS/RHEL: sudo yum install openssl-devel
+# Ubuntu/Debian: sudo apt-get install libssl-dev
+```
 
 ```bash
 # 进入代码目录(根据实际调整用户和目录)
@@ -31,7 +45,7 @@ export VBHOME=/home/vastbase/vasthome # 根据实际调整
 export PATH=$VBHOME/bin:$PATH
 export LD_LIBRARY_PATH=$VBHOME/lib:$LD_LIBRARY_PATH
 
-# 编译
+# 编译（已启用 OpenSSL KDF 支持）
 make clean
 make
 
@@ -93,6 +107,12 @@ RETURNS bytea AS 'sm4', 'sm4_encrypt_gcm' LANGUAGE C IMMUTABLE;
 
 CREATE OR REPLACE FUNCTION sm4_c_decrypt_gcm(ciphertext_with_tag bytea, key text, iv text, aad text DEFAULT NULL)
 RETURNS text AS 'sm4', 'sm4_decrypt_gcm' LANGUAGE C IMMUTABLE;
+
+CREATE OR REPLACE FUNCTION sm4_c_encrypt_cbc_kdf(plaintext text, password text, hash_algo text)
+RETURNS bytea AS 'sm4', 'sm4_encrypt_cbc_kdf' LANGUAGE C STRICT IMMUTABLE;
+
+CREATE OR REPLACE FUNCTION sm4_c_decrypt_cbc_kdf(ciphertext bytea, password text, hash_algo text)
+RETURNS text AS 'sm4', 'sm4_decrypt_cbc_kdf' LANGUAGE C STRICT IMMUTABLE;
 ```
 
 ## 停用扩展
@@ -112,6 +132,8 @@ DROP FUNCTION IF EXISTS sm4_c_encrypt_cbc(text, text, text);
 DROP FUNCTION IF EXISTS sm4_c_decrypt_cbc(bytea, text, text);
 DROP FUNCTION IF EXISTS sm4_c_encrypt_gcm(text, text, text, text);
 DROP FUNCTION IF EXISTS sm4_c_decrypt_gcm(bytea, text, text, text);
+DROP FUNCTION IF EXISTS sm4_c_encrypt_cbc_kdf(text, text, text);
+DROP FUNCTION IF EXISTS sm4_c_decrypt_cbc_kdf(bytea, text, text);
 ```
 
 **注意**：
@@ -149,6 +171,8 @@ vsql -d test01
 | `sm4_c_decrypt_hex(hex, key)`                  | ECB模式解密，输入十六进制密文     |
 | `sm4_c_encrypt_cbc(text, key, iv)`             | CBC模式加密，返回bytea            |
 | `sm4_c_decrypt_cbc(bytea, key, iv)`            | CBC模式解密，返回text             |
+| `sm4_c_encrypt_cbc_kdf(text, password, algo)`  | **CBC+KDF加密**，支持密钥派生 🔥  |
+| `sm4_c_decrypt_cbc_kdf(bytea, password, algo)` | **CBC+KDF解密**，支持密钥派生 🔥  |
 | `sm4_c_encrypt_gcm(text, key, iv, aad)`        | GCM模式加密，返回密文+Tag(bytea)  |
 | `sm4_c_decrypt_gcm(bytea, key, iv, aad)`       | GCM模式解密，返回text             |
 | `sm4_c_encrypt_gcm_base64(text, key, iv, aad)` | GCM模式加密，返回Base64编码(text) |
@@ -160,6 +184,26 @@ vsql -d test01
 
 - CBC模式: 16字节字符串 或 32位十六进制字符串
 - GCM模式: 12或16字节字符串 或 24/32位十六进制字符串（推荐12字节）
+
+### 🔥 新增：CBC KDF（密钥派生）模式
+
+**特性**：
+- ✅ 使用 PBKDF2 从密码派生密钥和IV（10,000次迭代）
+- ✅ 支持 SHA256/SHA384/SHA512/SM3 哈希算法
+- ✅ 自动生成随机盐值，增强安全性
+- ✅ 无需手动管理密钥和IV，简化使用
+
+**参数说明**：
+- `password`: 任意长度的密码（text）
+- `hash_algo`: 哈希算法，可选值：
+  - `'sha256'` - SHA-256（推荐，OpenSSL 1.1.1+）
+  - `'sha384'` - SHA-384（OpenSSL 1.1.1+）
+  - `'sha512'` - SHA-512（OpenSSL 1.1.1+）
+  - `'sm3'` - SM3 国密哈希（需要 OpenSSL 3.0+）
+
+**输出格式**：`[盐值 16字节] + [SM4 CBC 密文]`
+
+**详细文档**：请参考 [USAGE_KDF.md](USAGE_KDF.md)
 
 ## 运行示例
 
@@ -241,12 +285,80 @@ SELECT sm4_c_decrypt_gcm_base64(
 );
 -- 返回: Test Data
 
+-- 🔥 CBC KDF 模式示例（带密钥派生）
+-- SHA256 加密解密
+SELECT sm4_c_decrypt_cbc_kdf(
+    sm4_c_encrypt_cbc_kdf('Hello World!', 'mypassword', 'sha256'),
+    'mypassword',
+    'sha256'
+);
+
+-- SHA384 加密解密
+SELECT sm4_c_decrypt_cbc_kdf(
+    sm4_c_encrypt_cbc_kdf('Secret Message', 'strongpass', 'sha384'),
+    'strongpass',
+    'sha384'
+);
+
+-- SHA512 加密解密
+SELECT sm4_c_decrypt_cbc_kdf(
+    sm4_c_encrypt_cbc_kdf('Confidential', 'p@ssw0rd', 'sha512'),
+    'p@ssw0rd',
+    'sha512'
+);
+
+-- SM3 加密解密（需要 OpenSSL 3.0+）
+SELECT sm4_c_decrypt_cbc_kdf(
+    sm4_c_encrypt_cbc_kdf('国密测试', '中文密码', 'sm3'),
+    '中文密码',
+    'sm3'
+);
+
+-- 查看加密后的十六进制（每次不同，因为盐值随机）
+SELECT encode(sm4_c_encrypt_cbc_kdf('Test', 'password', 'sha256'), 'hex');
+
 -- 运行测试脚本
 vsql -d test01 -f test_sm4.sql
 
 vsql -d test01 -f test_sm4_gcm.sql
 
+vsql -d test01 -f test_sm4_cbc_kdf.sql  -- KDF模式测试
+
 vsql -d test01 -f demo_citizen_data.sql
+```
+
+## CBC KDF vs 标准 CBC 对比
+
+| 特性 | 标准 CBC | CBC KDF（密钥派生） |
+|------|---------|--------------------|
+| 密钥输入 | 16字节固定密钥 | 任意长度密码 |
+| IV管理 | 手动提供16字节IV | 自动派生 |
+| 盐值 | 无 | 自动生成并包含在输出 |
+| 密钥强化 | 无 | PBKDF2 10,000次迭代 |
+| 安全性 | 依赖密钥管理 | 密码派生增强 |
+| 适用场景 | 密钥已安全管理 | 基于密码的加密 |
+| 使用示例 | `sm4_c_encrypt_cbc()` | `sm4_c_encrypt_cbc_kdf()` |
+
+## 相关文档
+
+- **[USAGE_KDF.md](USAGE_KDF.md)** - CBC KDF 功能详细使用指南
+- **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)** - KDF 实现技术总结
+- **[test_sm4_cbc_kdf.sql](test_sm4_cbc_kdf.sql)** - KDF 功能测试脚本
+
+## 注意事项
+
+1. **OpenSSL 版本要求**：
+   - SHA256/384/512: OpenSSL 1.1.1+
+   - SM3: OpenSSL 3.0+（或 GmSSL）
+
+2. **性能考虑**：
+   - KDF 版本因 PBKDF2 迭代会比标准版本慢
+   - 适合需要密码保护的场景
+
+3. **向后兼容**：
+   - 所有原有函数保持不变
+   - 新函数使用 `_kdf` 后缀
+
 ```
 
 测试结果1：

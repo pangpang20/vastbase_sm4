@@ -110,21 +110,26 @@ END $$;
 
 - ✅ SM4 ECB模式加解密
 - ✅ SM4 CBC模式加解密
-- ✅ 支持bytea和十六进制字符串格式
+- 🔥 **SM4 CBC+KDF模式（密钥派生）** - 新增
+- ✅ SM4 GCM模式加解密（认证加密）
+- ✅ 支持bytea、十六进制、Base64多种格式
 - ✅ 完整的SQL函数接口
 - ✅ PKCS7填充支持
 
 ### 核心文件
 
-| 文件           | 说明               |
-| -------------- | ------------------ |
-| `sm4.c`        | SM4算法核心实现    |
-| `sm4_ext.c`    | PostgreSQL扩展接口 |
-| `sm4.h`        | 头文件定义         |
-| `sm4--1.0.sql` | SQL函数定义        |
-| `sm4.control`  | 扩展控制文件       |
-| `Makefile`     | 编译配置           |
-| `test_sm4.sql` | 测试脚本           |
+| 文件                        | 说明                       |
+| ----------------------------- | ---------------------------- |
+| `sm4.c`                       | SM4算法核心实现            |
+| `sm4_ext.c`                   | PostgreSQL扩展接口         |
+| `sm4.h`                       | 头文件定义                 |
+| `sm4--1.0.sql`                | SQL函数定义                |
+| `sm4.control`                 | 扩展控制文件               |
+| `Makefile`                    | 编译配置（启用OpenSSL KDF） |
+| `test_sm4.sql`                | ECB/CBC测试脚本            |
+| `test_sm4_cbc_kdf.sql` 🔥     | CBC KDF测试脚本            |
+| `USAGE_KDF.md` 🔥            | KDF功能详细使用指南       |
+| `IMPLEMENTATION_SUMMARY.md` 🔥 | KDF实现技术总结           |
 
 ### 提供的SQL函数
 
@@ -140,6 +145,19 @@ sm4_c_decrypt_hex(text, text) RETURNS text
 -- CBC模式
 sm4_c_encrypt_cbc(text, text, text) RETURNS bytea
 sm4_c_decrypt_cbc(bytea, text, text) RETURNS text
+
+-- 🔥 CBC+KDF模式（密钥派生）
+sm4_c_encrypt_cbc_kdf(text, password, hash_algo) RETURNS bytea
+sm4_c_decrypt_cbc_kdf(bytea, password, hash_algo) RETURNS text
+  -- hash_algo: 'sha256' | 'sha384' | 'sha512' | 'sm3'
+  -- 使用PBKDF2从密码派生密钥和IV（10,000次迭代）
+  -- 自动生成随机盐值，无需手动管理密钥/IV
+
+-- GCM模式（认证加密）
+sm4_c_encrypt_gcm(text, key, iv, aad) RETURNS bytea
+sm4_c_decrypt_gcm(bytea, key, iv, aad) RETURNS text
+sm4_c_encrypt_gcm_base64(text, key, iv, aad) RETURNS text
+sm4_c_decrypt_gcm_base64(text, key, iv, aad) RETURNS text
 ```
 
 ### C扩展使用示例
@@ -153,6 +171,28 @@ SELECT sm4_c_decrypt_hex('encrypted_hex_string', 'mykey12345678901') AS phone;
 
 -- CBC模式加密（更安全）
 SELECT sm4_c_encrypt_cbc('sensitive data', 'mykey12345678901', '1234567890abcdef');
+
+-- 🔥 CBC+KDF模式（密钥派生，不需管理IV）
+-- SHA256加密解密
+SELECT sm4_c_decrypt_cbc_kdf(
+    sm4_c_encrypt_cbc_kdf('Hello World!', 'mypassword', 'sha256'),
+    'mypassword',
+    'sha256'
+);
+
+-- SHA384加密解密
+SELECT sm4_c_decrypt_cbc_kdf(
+    sm4_c_encrypt_cbc_kdf('Secret Data', 'strongpass', 'sha384'),
+    'strongpass',
+    'sha384'
+);
+
+-- SM3国密哈希加密解密（OpenSSL 3.0+）
+SELECT sm4_c_decrypt_cbc_kdf(
+    sm4_c_encrypt_cbc_kdf('国密测试', '中文密码', 'sm3'),
+    '中文密码',
+    'sm3'
+);
 ```
 
 ### C扩展应用场景
@@ -161,8 +201,11 @@ SELECT sm4_c_encrypt_cbc('sensitive data', 'mykey12345678901', '1234567890abcdef
 - ✅ 敏感信息保护（手机号、身份证等）
 - ✅ 数据脱敏查询
 - ✅ 政务系统数据安全
+- 🔥 **基于密码的加密（使用KDF）**
+- 🔥 **多哈希算法支持（SHA256/384/512/SM3）**
 
-**详细文档**: 查看 [sm4_c/README.md](sm4_c/README.md)
+**详细文档**: 查看 [sm4_c/README.md](sm4_c/README.md)  
+**KDF功能详解**: 查看 [sm4_c/USAGE_KDF.md](sm4_c/USAGE_KDF.md)
 
 ---
 
@@ -314,15 +357,33 @@ export SM4_KEY="your_secret_key"
 
 ### 2. 密钥格式
 
-支持两种密钥格式：
+支持多种密钥格式：
 
 - **16字节字符串**: `"mykey12345678901"` (推荐)
 - **32位十六进制**: `"6d796b657931323334353637383930"`
+- 🔥 **KDF密码模式**: 任意长度密码，自动派生密钥
+
+```sql
+-- 标准模式：需要固定长度密钥
+SELECT sm4_c_encrypt_cbc('data', 'mykey12345678901', '1234567890abcdef');
+
+-- 🔥 KDF模式：任意密码长度，自动派生
+SELECT sm4_c_encrypt_cbc_kdf('data', 'any_length_password_here', 'sha256');
+```
 
 ### 3. 加密模式选择
 
 - **ECB模式**: 简单快速，适合独立字段加密
 - **CBC模式**: 更安全，适合大数据或高安全要求场景
+- 🔥 **CBC+KDF模式**: 基于密码，自动密钥管理，最安全
+
+| 特性 | ECB | CBC | CBC+KDF 🔥 |
+|------|-----|-----|-------------|
+| 安全性 | 低 | 高 | **最高** |
+| 性能 | 快 | 中 | 中（PBKDF2） |
+| IV管理 | 无 | 手动 | **自动** |
+| 密钥要求 | 16字节 | 16字节 | **任意长度** |
+| 适用场景 | 简单加密 | 通用加密 | **密码加密** |
 
 ### 4. 访问控制
 

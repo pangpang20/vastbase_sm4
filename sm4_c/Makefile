@@ -5,12 +5,15 @@ VBHOME ?= /home/vastbase/vasthome
 
 # 编译器 (必须用g++)
 CXX = g++
-CXXFLAGS = -O2 -Wall -fPIC -std=c++11
+CXXFLAGS = -O2 -Wall -fPIC -std=c++11 -DUSE_OPENSSL_KDF
 
 # 包含路径
 INCLUDES = -I$(VBHOME)/include/postgresql/server \
            -I$(VBHOME)/include/postgresql/internal \
            -I$(VBHOME)/include
+
+# 链接OpenSSL库
+LDFLAGS = -lssl -lcrypto
 
 # 目标文件
 OBJS = sm4.o sm4_ext.o
@@ -25,7 +28,7 @@ EXTDIR = $(VBHOME)/share/postgresql/extension
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
-	$(CXX) -shared -o $@ $(OBJS)
+	$(CXX) -shared -o $@ $(OBJS) $(LDFLAGS)
 
 sm4.o: sm4.c sm4.h
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -c -o $@ $<
