@@ -1112,8 +1112,30 @@ int sm4_cbc_encrypt_gs_format(
         return -1;
     }
 
-    /* 使用标准CBC加密明文 */
-    ret = sm4_cbc_encrypt(key, iv, input, input_len, ciphertext, &cipher_len);
+    /* DWS在明文前添加8字节长度信息 */
+    const size_t PLAINTEXT_PREFIX_LEN = 8;
+    size_t total_plaintext_len = PLAINTEXT_PREFIX_LEN + input_len;
+    uint8_t *plaintext_with_prefix = (uint8_t *)malloc(total_plaintext_len);
+    if (!plaintext_with_prefix) {
+        free(ciphertext);
+        return -1;
+    }
+    
+    /* 前8字节存储原始明文长度（大端序） */
+    plaintext_with_prefix[0] = (uint8_t)(input_len >> 56);
+    plaintext_with_prefix[1] = (uint8_t)(input_len >> 48);
+    plaintext_with_prefix[2] = (uint8_t)(input_len >> 40);
+    plaintext_with_prefix[3] = (uint8_t)(input_len >> 32);
+    plaintext_with_prefix[4] = (uint8_t)(input_len >> 24);
+    plaintext_with_prefix[5] = (uint8_t)(input_len >> 16);
+    plaintext_with_prefix[6] = (uint8_t)(input_len >> 8);
+    plaintext_with_prefix[7] = (uint8_t)(input_len);
+    memcpy(plaintext_with_prefix + PLAINTEXT_PREFIX_LEN, input, input_len);
+
+    /* 使用标准CBC加密明文（带长度前缀） */
+    ret = sm4_cbc_encrypt(key, iv, plaintext_with_prefix, total_plaintext_len, ciphertext, &cipher_len);
+    free(plaintext_with_prefix);
+    
     if (ret != 0) {
         free(ciphertext);
         return -1;
@@ -1295,15 +1317,16 @@ int sm4_cbc_decrypt_gs_format(
     */
     
     /* 分配解密缓冲区 */
-    uint8_t *plaintext = (uint8_t *)malloc(cipher_len);
-    if (!plaintext) {
+    uint8_t *plaintext_with_prefix = (uint8_t *)malloc(cipher_len);
+    if (!plaintext_with_prefix) {
         free(binary_data);
         return -1;
     }
     
+    size_t decrypted_len;
     /* 使用标准CBC解密 */
     ret = sm4_cbc_decrypt(key, iv, ciphertext, cipher_len,
-                          plaintext, output_len);
+                          plaintext_with_prefix, &decrypted_len);
     
     /* 清理敏感数据 */
     memset(key, 0, sizeof(key));
@@ -1312,13 +1335,38 @@ int sm4_cbc_decrypt_gs_format(
     free(binary_data);
     
     if (ret != 0) {
-        free(plaintext);
+        free(plaintext_with_prefix);
         return ret;
     }
     
-    /* 拷贝解密结果 */
-    memcpy(output, plaintext, *output_len);
-    free(plaintext);
+    /* 检查解密后的数据长度是否足够（至少8字节长度前缀） */
+    const size_t PLAINTEXT_PREFIX_LEN = 8;
+    if (decrypted_len < PLAINTEXT_PREFIX_LEN) {
+        free(plaintext_with_prefix);
+        return -1;  /* 数据太短 */
+    }
+    
+    /* 提取原始明文长度（大端序） */
+    size_t original_len = ((size_t)plaintext_with_prefix[0] << 56) |
+                          ((size_t)plaintext_with_prefix[1] << 48) |
+                          ((size_t)plaintext_with_prefix[2] << 40) |
+                          ((size_t)plaintext_with_prefix[3] << 32) |
+                          ((size_t)plaintext_with_prefix[4] << 24) |
+                          ((size_t)plaintext_with_prefix[5] << 16) |
+                          ((size_t)plaintext_with_prefix[6] << 8) |
+                          ((size_t)plaintext_with_prefix[7]);
+    
+    /* 验证长度合法性 */
+    if (original_len + PLAINTEXT_PREFIX_LEN > decrypted_len) {
+        free(plaintext_with_prefix);
+        return -1;  /* 长度不合法 */
+    }
+    
+    /* 提取原始明文（跳过8字节前缀） */
+    *output_len = original_len;
+    memcpy(output, plaintext_with_prefix + PLAINTEXT_PREFIX_LEN, original_len);
+    
+    free(plaintext_with_prefix);
     
     return 0;
 }
