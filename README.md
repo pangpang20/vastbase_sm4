@@ -128,8 +128,7 @@ END $$;
 | `Makefile`                    | 编译配置（启用OpenSSL KDF） |
 | `test_sm4.sql`                | ECB/CBC测试脚本            |
 | `test_sm4_cbc_kdf.sql` 🔥     | CBC KDF测试脚本            |
-| `USAGE_KDF.md` 🔥            | KDF功能详细使用指南       |
-| `IMPLEMENTATION_SUMMARY.md` 🔥 | KDF实现技术总结           |
+| `test_sm4_gs_compat.sql` 🎯   | GS格式兼容性测试脚本   |
 
 ### 提供的SQL函数
 
@@ -152,6 +151,10 @@ sm4_c_decrypt_cbc_kdf(bytea, password, hash_algo) RETURNS text
   -- hash_algo: 'sha256' | 'sha384' | 'sha512' | 'sm3'
   -- 使用PBKDF2从密码派生密钥和IV（10,000次迭代）
   -- 自动生成随机盐值，无需手动管理密钥/IV
+
+-- 🎯 兼容VastBase gs_encrypt格式
+sm4_c_encrypt_cbc_gs(text, password, hash_algo) RETURNS text  -- Base64
+sm4_c_decrypt_cbc_gs(text, password) RETURNS text  -- 自动识别算法
 
 -- GCM模式（认证加密）
 sm4_c_encrypt_gcm(text, key, iv, aad) RETURNS bytea

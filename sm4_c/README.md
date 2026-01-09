@@ -14,10 +14,9 @@
 ├── test_sm4.sql               # ECB/CBC测试脚本
 ├── test_sm4_gcm.sql           # GCM模式测试脚本
 ├── test_sm4_cbc_kdf.sql       # CBC KDF模式测试脚本
+├── test_sm4_gs_compat.sql     # GS格式兼容性测试脚本
 ├── demo_citizen_data.sql      # 示例数据
-├── README.md                  # 使用文档（本文件）
-├── USAGE_KDF.md               # KDF功能详细使用指南
-└── IMPLEMENTATION_SUMMARY.md  # KDF实现总结
+└── README.md                  # 使用文档（本文件）
 ```
 
 ## 编译安装
@@ -205,7 +204,21 @@ vsql -d test01
 
 **输出格式**：`[盐值 16字节] + [SM4 CBC 密文]`
 
-**详细文档**：请参考 [USAGE_KDF.md](USAGE_KDF.md)
+### ❓ 常见问题
+
+**Q1: SM3 算法不可用怎么办？**
+- 需要 OpenSSL 3.0+ 或 GmSSL
+- 检查: `openssl version`
+- 如果版本较低，使用 SHA256/384/512 替代
+
+**Q2: 密钥派生性能影响？**
+- PBKDF2 10,000 次迭代约需 10-50ms
+- 比标准 CBC 慢约 10-20 倍
+- 适合需要密码保护的场景
+
+**Q3: 为什么每次加密结果不同？**
+- 因为每次生成的随机盐值不同
+- 这是安全特性，防止彩虹表攻击
 
 ### 🎯 新增：兼容 VastBase gs_encrypt 格式
 
@@ -392,12 +405,6 @@ vsql -d test01 -f demo_citizen_data.sql
 | 安全性 | 依赖密钥管理 | 密码派生增强 | 密码派生增强 |
 | 适用场景 | 密钥已安全管理 | 基于密码的加密 | **与gs_encrypt互操作** |
 | 使用示例 | `sm4_c_encrypt_cbc()` | `sm4_c_encrypt_cbc_kdf()` | `sm4_c_encrypt_cbc_gs()` |
-
-## 相关文档
-
-- **[USAGE_KDF.md](USAGE_KDF.md)** - CBC KDF 功能详细使用指南
-- **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)** - KDF 实现技术总结
-- **[test_sm4_cbc_kdf.sql](test_sm4_cbc_kdf.sql)** - KDF 功能测试脚本
 
 ## 注意事项
 
