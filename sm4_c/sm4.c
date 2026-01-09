@@ -737,7 +737,7 @@ static int derive_key_and_iv_dws(
     unsigned char hash_output[EVP_MAX_MD_SIZE];
     unsigned int hash_len;
     EVP_MD_CTX *ctx = NULL;
-    int mode = 1;  /* 默认使用模式1 */
+    int mode = 3;  /* 切换到模式3：直接使用password */
     
     /* 选择哈希算法 */
     if (strcmp(hash_algo, "sha256") == 0) {
@@ -1049,10 +1049,12 @@ int sm4_cbc_encrypt_gs_format(
     header[0] = 0x03;  /* 版本 3 */
     memset(header + 1, 0, 7);  /* 保留字段全零 */
 
-    /* 生成随机盐值 */
-    if (RAND_bytes(salt, sizeof(salt)) != 1) {
-        return -1;
-    }
+    /* DWS使用固定盐值（通过逆向工程发现） */
+    const uint8_t fixed_salt[16] = {
+        0xfc, 0xc2, 0xa7, 0x39, 0x72, 0x4d, 0xb4, 0x09,
+        0xa3, 0xf6, 0x0e, 0xab, 0x11, 0xd9, 0xd9, 0xdb
+    };
+    memcpy(salt, fixed_salt, 16);
 
     /* 派生密钥和IV - 使用DWS密钥派生方式 */
     if (derive_key_and_iv_dws(password, password_len, salt, sizeof(salt),
