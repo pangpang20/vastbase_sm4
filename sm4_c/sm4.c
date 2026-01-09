@@ -912,39 +912,22 @@ int sm4_cbc_encrypt_gs_format(
     char *output,
     size_t *output_len)
 {
-    uint8_t header[8];  /* version(1) + hash_type(1) + reserved(6) */
+    uint8_t header[8];  /* version(1) + reserved(7) - DWS格式 */
     uint8_t salt[16];
     uint8_t key[SM4_KEY_SIZE];
     uint8_t iv[SM4_BLOCK_SIZE];
     uint8_t *binary_output;
     size_t cipher_len;
     size_t total_len;
-    uint8_t hash_type;
     int ret;
 
     if (!password || !hash_algo || !input || !output || !output_len) {
         return -1;
     }
 
-    /* 设置版本号 */
+    /* 设置版本号和保留字段（DWS格式：版本03 + 7字节全零） */
     header[0] = 0x03;  /* 版本 3 */
-
-    /* 设置哈希算法类型 */
-    if (strcmp(hash_algo, "sha256") == 0) {
-        hash_type = 0;
-    } else if (strcmp(hash_algo, "sha384") == 0) {
-        hash_type = 1;
-    } else if (strcmp(hash_algo, "sha512") == 0) {
-        hash_type = 2;
-    } else if (strcmp(hash_algo, "sm3") == 0) {
-        hash_type = 3;
-    } else {
-        return -1;
-    }
-    header[1] = hash_type;
-
-    /* 保留字段填零 */
-    memset(header + 2, 0, 6);
+    memset(header + 1, 0, 7);  /* 保留字段全零 */
 
     /* 生成随机盐值 */
     if (RAND_bytes(salt, sizeof(salt)) != 1) {
@@ -992,11 +975,13 @@ int sm4_cbc_encrypt_gs_format(
 
 /*
  * SM4 CBC模式解密（兼容gs_encrypt格式）
- * 输入格式: Base64(version[1] + hash_type[1] + reserved[6] + salt[16] + ciphertext)
+ * 输入格式: Base64(version[1] + reserved[7] + salt[16] + ciphertext)
+ * 注意：DWS格式不在数据中存储哈希算法，需要通过参数指定
  */
 int sm4_cbc_decrypt_gs_format(
     const uint8_t *password,
     size_t password_len,
+    const char *hash_algo,
     const uint8_t *input,
     size_t input_len,
     uint8_t *output,
@@ -1004,8 +989,7 @@ int sm4_cbc_decrypt_gs_format(
 {
     uint8_t *binary_data;
     size_t binary_len;
-    uint8_t version, hash_type;
-    const char *hash_algo;
+    uint8_t version;
     const uint8_t *salt;
     const uint8_t *ciphertext;
     size_t cipher_len;
@@ -1013,7 +997,7 @@ int sm4_cbc_decrypt_gs_format(
     uint8_t iv[SM4_BLOCK_SIZE];
     int ret;
 
-    if (!password || !input || !output || !output_len) {
+    if (!password || !hash_algo || !input || !output || !output_len) {
         return -1;
     }
 
@@ -1034,25 +1018,13 @@ int sm4_cbc_decrypt_gs_format(
         return -1;
     }
 
-    /* 解析 header */
+    /* 解析 header - DWS格式只检查版本号 */
     version = binary_data[0];
-    hash_type = binary_data[1];
 
     /* 验证版本号 */
     if (version != 0x03) {
         free(binary_data);
         return -1;  /* 不支持的版本 */
-    }
-
-    /* 根据 hash_type 选择算法 */
-    switch (hash_type) {
-        case 0: hash_algo = "sha256"; break;
-        case 1: hash_algo = "sha384"; break;
-        case 2: hash_algo = "sha512"; break;
-        case 3: hash_algo = "sm3"; break;
-        default:
-            free(binary_data);
-            return -1;
     }
 
     /* 提取盐值和密文 */

@@ -1203,7 +1203,7 @@ sm4_encrypt_cbc_gs(PG_FUNCTION_ARGS)
 }
 
 /*
- * sm4_decrypt_cbc_gs(ciphertext text, password text) -> text
+ * sm4_decrypt_cbc_gs(ciphertext text, password text, hash_algo text) -> text
  * CBC模式解密，兼容gs_encrypt格式，输入Base64
  */
 extern "C" Datum
@@ -1211,10 +1211,12 @@ sm4_decrypt_cbc_gs(PG_FUNCTION_ARGS)
 {
     text *ciphertext = PG_GETARG_TEXT_PP(0);
     text *password = PG_GETARG_TEXT_PP(1);
+    text *hash_algo_text = PG_GETARG_TEXT_PP(2);
     char *cipher_str;
     size_t cipher_len;
     char *pass_str;
     size_t pass_len;
+    char *hash_algo;
     uint8_t *plain;
     size_t plain_len;
     text *result;
@@ -1227,15 +1229,32 @@ sm4_decrypt_cbc_gs(PG_FUNCTION_ARGS)
     pass_str = text_to_cstring(password);
     pass_len = strlen(pass_str);
 
+    /* 获取哈希算法 */
+    hash_algo = text_to_cstring(hash_algo_text);
+
+    /* 验证哈希算法 */
+    if (strcmp(hash_algo, "sha256") != 0 &&
+        strcmp(hash_algo, "sha384") != 0 &&
+        strcmp(hash_algo, "sha512") != 0 &&
+        strcmp(hash_algo, "sm3") != 0) {
+        pfree(cipher_str);
+        pfree(pass_str);
+        pfree(hash_algo);
+        ereport(ERROR,
+                (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+                 errmsg("Hash algorithm must be one of: sha256, sha384, sha512, sm3")));
+    }
+
     /* 分配明文缓冲区 */
     plain = (uint8_t *)palloc(cipher_len);  /* Base64解码后会更小 */
 
     /* 解密 */
-    if (sm4_cbc_decrypt_gs_format((uint8_t *)pass_str, pass_len,
+    if (sm4_cbc_decrypt_gs_format((uint8_t *)pass_str, pass_len, hash_algo,
                                    (uint8_t *)cipher_str, cipher_len,
                                    plain, &plain_len) != 0) {
         pfree(cipher_str);
         pfree(pass_str);
+        pfree(hash_algo);
         pfree(plain);
         ereport(ERROR,
                 (errcode(ERRCODE_INTERNAL_ERROR),
@@ -1249,6 +1268,7 @@ sm4_decrypt_cbc_gs(PG_FUNCTION_ARGS)
 
     pfree(cipher_str);
     pfree(pass_str);
+    pfree(hash_algo);
     pfree(plain);
 
     PG_RETURN_TEXT_P(result);

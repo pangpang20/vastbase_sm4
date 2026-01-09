@@ -173,7 +173,7 @@ vsql -d test01
 | `sm4_c_encrypt_cbc_kdf(text, password, algo)`  | **CBC+KDF加密**，支持密钥派生 🔥  |
 | `sm4_c_decrypt_cbc_kdf(bytea, password, algo)` | **CBC+KDF解密**，支持密钥派生 🔥  |
 | `sm4_c_encrypt_cbc_gs(text, password, algo)`   | **兼容DWS gs_encrypt格式加密** 🎯     |
-| `sm4_c_decrypt_cbc_gs(text, password)`         | **兼容DWS gs_encrypt格式解密** 🎯     |
+| `sm4_c_decrypt_cbc_gs(text, password, algo)`   | **兼容DWS gs_encrypt格式解密** 🎯     |
 | `sm4_c_encrypt_gcm(text, key, iv, aad)`        | GCM模式加密，返回密文+Tag(bytea)  |
 | `sm4_c_decrypt_gcm(bytea, key, iv, aad)`       | GCM模式解密，返回text             |
 | `sm4_c_encrypt_gcm_base64(text, key, iv, aad)` | GCM模式加密，返回Base64编码(text) |

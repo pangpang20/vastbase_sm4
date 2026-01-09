@@ -119,10 +119,10 @@ COMMENT ON FUNCTION sm4_c_encrypt_cbc_gs(text, text, text) IS
 'SM4 CBC模式加密(C扩展)，兼容gs_encrypt格式。参数: plaintext-明文, password-密码, hash_algo-哈希算法(sha256/sha384/sha512/sm3)。返回Base64编码的加密数据，格式与DWS gs_encrypt兼容。包含版本号+算法标识+盐值+密文。';
 
 -- CBC模式解密（兼容gs_encrypt格式）- C扩展版本
-CREATE OR REPLACE FUNCTION sm4_c_decrypt_cbc_gs(ciphertext text, password text)
+CREATE OR REPLACE FUNCTION sm4_c_decrypt_cbc_gs(ciphertext text, password text, hash_algo text)
 RETURNS text
 AS 'sm4', 'sm4_decrypt_cbc_gs'
 LANGUAGE C STRICT IMMUTABLE;
 
-COMMENT ON FUNCTION sm4_c_decrypt_cbc_gs(text, text) IS 
-'SM4 CBC模式解密(C扩展)，兼容gs_encrypt格式。参数: ciphertext-Base64编码的密文(gs_encrypt格式), password-密码。返回明文。自动识别哈希算法类型，可解密DWS gs_encrypt加密的数据。';
+COMMENT ON FUNCTION sm4_c_decrypt_cbc_gs(text, text, text) IS 
+'SM4 CBC模式解密(C扩展)，兼容gs_encrypt格式。参数: ciphertext-Base64编码的密文(gs_encrypt格式), password-密码, hash_algo-哈希算法(sha256/sha384/sha512/sm3)。返回明文。兼容DWS gs_encrypt加密的数据。';
