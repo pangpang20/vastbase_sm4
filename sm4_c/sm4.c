@@ -723,6 +723,7 @@ static int derive_key_and_iv(
  * mode 1: hash(password + salt)
  * mode 2: hash(salt + password)
  * mode 3: 直接使用password作为key，salt作为iv
+ * mode 4: EVP_BytesToKey (OpenSSL标准)
  */
 static int derive_key_and_iv_dws(
     const uint8_t *password,
@@ -737,7 +738,7 @@ static int derive_key_and_iv_dws(
     unsigned char hash_output[EVP_MAX_MD_SIZE];
     unsigned int hash_len;
     EVP_MD_CTX *ctx = NULL;
-    int mode = 2;  /* 切换到模式2：hash(salt + password) */
+    int mode = 4;  /* 尝试模式4：EVP_BytesToKey */
     
     /* 选择哈希算法 */
     if (strcmp(hash_algo, "sha256") == 0) {
@@ -756,7 +757,24 @@ static int derive_key_and_iv_dws(
         return -1;
     }
 
-    if (mode == 1) {
+    if (mode == 4) {
+        /* 模式4: EVP_BytesToKey (OpenSSL标准密钥派生) */
+        int ret = EVP_BytesToKey(
+            EVP_sm4_cbc(),      /* cipher */
+            md,                 /* hash algorithm */
+            salt,               /* salt */
+            password,           /* password */
+            password_len,       /* password length */
+            1,                  /* iteration count (DWS可能用1次) */
+            key,                /* output key */
+            iv                  /* output iv */
+        );
+        
+        if (ret != 16) {  /* 应该返回密钥长度16 */
+            return -1;
+        }
+        
+    } else if (mode == 1) {
         /* 模式1: hash(password + salt) */
         ctx = EVP_MD_CTX_new();
         if (!ctx) {
