@@ -720,6 +720,9 @@ static int derive_key_and_iv(
 /*
  * DWS gs_encrypt 密钥派生（测试版本）
  * 尝试多种可能的密钥派生方式
+ * mode 1: hash(password + salt)
+ * mode 2: hash(salt + password)
+ * mode 3: 直接使用password作为key，salt作为iv
  */
 static int derive_key_and_iv_dws(
     const uint8_t *password,
@@ -731,7 +734,10 @@ static int derive_key_and_iv_dws(
     uint8_t *iv)
 {
     const EVP_MD *md = NULL;
-    uint8_t derived[32];
+    unsigned char hash_output[EVP_MAX_MD_SIZE];
+    unsigned int hash_len;
+    EVP_MD_CTX *ctx = NULL;
+    int mode = 1;  /* 默认使用模式1 */
     
     /* 选择哈希算法 */
     if (strcmp(hash_algo, "sha256") == 0) {
@@ -750,16 +756,83 @@ static int derive_key_and_iv_dws(
         return -1;
     }
 
-    /* 方法1: 直接使用密码（填充或截断到16字节） + 盐值作为IV */
-    memset(key, 0, 16);
-    memset(iv, 0, 16);
-    
-    if (password_len >= 16) {
-        memcpy(key, password, 16);
-    } else {
-        memcpy(key, password, password_len);
+    if (mode == 1) {
+        /* 模式1: hash(password + salt) */
+        ctx = EVP_MD_CTX_new();
+        if (!ctx) {
+            return -1;
+        }
+
+        if (EVP_DigestInit_ex(ctx, md, NULL) != 1) {
+            EVP_MD_CTX_free(ctx);
+            return -1;
+        }
+        
+        if (EVP_DigestUpdate(ctx, password, password_len) != 1) {
+            EVP_MD_CTX_free(ctx);
+            return -1;
+        }
+        
+        if (EVP_DigestUpdate(ctx, salt, salt_len) != 1) {
+            EVP_MD_CTX_free(ctx);
+            return -1;
+        }
+        
+        if (EVP_DigestFinal_ex(ctx, hash_output, &hash_len) != 1) {
+            EVP_MD_CTX_free(ctx);
+            return -1;
+        }
+        
+        EVP_MD_CTX_free(ctx);
+
+        /* 从哈希值中提取密钥和IV */
+        memcpy(key, hash_output, 16);
+        memcpy(iv, hash_output + 16, 16);
+        
+    } else if (mode == 2) {
+        /* 模式2: hash(salt + password) */
+        ctx = EVP_MD_CTX_new();
+        if (!ctx) {
+            return -1;
+        }
+
+        if (EVP_DigestInit_ex(ctx, md, NULL) != 1) {
+            EVP_MD_CTX_free(ctx);
+            return -1;
+        }
+        
+        if (EVP_DigestUpdate(ctx, salt, salt_len) != 1) {
+            EVP_MD_CTX_free(ctx);
+            return -1;
+        }
+        
+        if (EVP_DigestUpdate(ctx, password, password_len) != 1) {
+            EVP_MD_CTX_free(ctx);
+            return -1;
+        }
+        
+        if (EVP_DigestFinal_ex(ctx, hash_output, &hash_len) != 1) {
+            EVP_MD_CTX_free(ctx);
+            return -1;
+        }
+        
+        EVP_MD_CTX_free(ctx);
+
+        memcpy(key, hash_output, 16);
+        memcpy(iv, hash_output + 16, 16);
+        
+    } else if (mode == 3) {
+        /* 模式3: 直接使用password作为key，salt作为iv */
+        memset(key, 0, 16);
+        memset(iv, 0, 16);
+        
+        if (password_len >= 16) {
+            memcpy(key, password, 16);
+        } else {
+            memcpy(key, password, password_len);
+        }
+        memcpy(iv, salt, 16);
     }
-    memcpy(iv, salt, 16);
     
     return 0;
 }
@@ -944,7 +1017,8 @@ static int base64_decode_internal(const uint8_t *input, size_t len, uint8_t *out
 
 /*
  * SM4 CBC模式加密（兼容gs_encrypt格式）
- * 输出格式: Base64(version[1] + hash_type[1] + reserved[6] + salt[16] + ciphertext)
+ * 输出格式: Base64(version[1] + reserved[7] + salt[16] + ciphertext)
+ * DWS格式：在明文前添加48字节随机数据
  */
 int sm4_cbc_encrypt_gs_format(
     const uint8_t *password,
@@ -960,9 +1034,12 @@ int sm4_cbc_encrypt_gs_format(
     uint8_t key[SM4_KEY_SIZE];
     uint8_t iv[SM4_BLOCK_SIZE];
     uint8_t *binary_output;
+    uint8_t *plaintext_with_random;
+    size_t plaintext_total_len;
     size_t cipher_len;
     size_t total_len;
     int ret;
+    const size_t RANDOM_PREFIX_LEN = 48;  /* DWS在明文前添加48字节随机数据 */
 
     if (!password || !hash_algo || !input || !output || !output_len) {
         return -1;
@@ -983,10 +1060,27 @@ int sm4_cbc_encrypt_gs_format(
         return -1;
     }
 
+    /* 准备明文：48字节随机数据 + 原始明文 */
+    plaintext_total_len = RANDOM_PREFIX_LEN + input_len;
+    plaintext_with_random = (uint8_t *)malloc(plaintext_total_len);
+    if (!plaintext_with_random) {
+        return -1;
+    }
+
+    /* 生成48字节随机前缀 */
+    if (RAND_bytes(plaintext_with_random, RANDOM_PREFIX_LEN) != 1) {
+        free(plaintext_with_random);
+        return -1;
+    }
+
+    /* 拷贝原始明文 */
+    memcpy(plaintext_with_random + RANDOM_PREFIX_LEN, input, input_len);
+
     /* 分配二进制输出缓冲区: header(8) + salt(16) + ciphertext */
-    cipher_len = input_len + SM4_BLOCK_SIZE;  /* 最大填充后长度 */
+    cipher_len = plaintext_total_len + SM4_BLOCK_SIZE;  /* 最大填充后长度 */
     binary_output = (uint8_t *)malloc(8 + 16 + cipher_len);
     if (!binary_output) {
+        free(plaintext_with_random);
         return -1;
     }
 
@@ -994,13 +1088,14 @@ int sm4_cbc_encrypt_gs_format(
     memcpy(binary_output, header, 8);
     memcpy(binary_output + 8, salt, 16);
 
-    /* 使用标准CBC加密 */
-    ret = sm4_cbc_encrypt(key, iv, input, input_len,
+    /* 使用标准CBC加密（包含随机前缀的明文） */
+    ret = sm4_cbc_encrypt(key, iv, plaintext_with_random, plaintext_total_len,
                           binary_output + 24, &cipher_len);
 
     /* 清理敏感数据 */
     memset(key, 0, sizeof(key));
     memset(iv, 0, sizeof(iv));
+    free(plaintext_with_random);
 
     if (ret != 0) {
         free(binary_output);
@@ -1081,16 +1176,42 @@ int sm4_cbc_decrypt_gs_format(
         free(binary_data);
         return -1;
     }
-
+    
+    /* 分配临时缓冲区用于解密（包含随机前缀） */
+    uint8_t *decrypted_with_random = (uint8_t *)malloc(cipher_len);
+    size_t decrypted_len;
+    const size_t RANDOM_PREFIX_LEN = 48;  /* DWS在明文前添加48字节随机数据 */
+        
+    if (!decrypted_with_random) {
+        free(binary_data);
+        return -1;
+    }
+    
     /* 使用标准CBC解密 */
     ret = sm4_cbc_decrypt(key, iv, ciphertext, cipher_len,
-                          output, output_len);
-
+                          decrypted_with_random, &decrypted_len);
+    
     /* 清理敏感数据 */
     memset(key, 0, sizeof(key));
     memset(iv, 0, sizeof(iv));
     free(binary_data);
-
-    return ret;
+    
+    if (ret != 0) {
+        free(decrypted_with_random);
+        return ret;
+    }
+    
+    /* 检查解密后的数据长度是否足够 */
+    if (decrypted_len < RANDOM_PREFIX_LEN) {
+        free(decrypted_with_random);
+        return -1;  /* 数据太短，不符合DWS格式 */
+    }
+    
+    /* 移除前48字节随机数据，提取原始明文 */
+    *output_len = decrypted_len - RANDOM_PREFIX_LEN;
+    memcpy(output, decrypted_with_random + RANDOM_PREFIX_LEN, *output_len);
+    
+    free(decrypted_with_random);
+    return 0;
 }
 #endif /* USE_OPENSSL_KDF */

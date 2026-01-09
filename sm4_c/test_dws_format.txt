@@ -1,0 +1,34 @@
+DWS gs_encrypt 格式分析
+========================
+
+测试数据：
+明文: "TESTDATA" (8字节)
+密码: "1234567890123456"
+算法: sha256
+
+我们的加密输出：
+Base64: AwAAAAAAAABf6/dPf5MpkYHLd4/ZRiKGAhDP/ZGQE2At5KJ2dPlAMA==
+长度: 56字符 → 42字节
+结构: 8 header + 16 salt + 18 密文(16数据块+2填充)
+✅ 自解密成功
+
+DWS的加密输出：
+Base64: AwAAAAAAAAD8wqc5ck20CaP2DqsR2dnbF+OrqsKjtzjRHKYgefmy+fqjw6mGKfb0GZaX9KqtTD0pi7GDO1aIJ9oy30nD7EM5WyFL2SkepA/kewNxG6r4bw==
+长度: 120字符 → 90字节  
+结构: 8 header + 16 salt + 66 密文(64数据块+2填充)
+❌ 我们无法解密
+
+关键发现：
+1. DWS 的密文比我们的长 48 字节（3个SM4块）
+2. 可能的原因：
+   - DWS 在明文前添加了随机nonce（防重放）
+   - DWS 在明文中添加了MAC或校验码
+   - DWS 使用了不同的数据格式
+
+推测的 DWS 明文格式：
+[随机数据 N字节] + [原始明文 M字节] + [PKCS7填充]
+
+需要测试：
+1. 不同长度明文的加密长度（找出规律）
+2. 同一明文多次加密的输出（检查是否有随机数据）
+3. 尝试不同的密钥派生方式
