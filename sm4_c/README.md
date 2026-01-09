@@ -172,8 +172,8 @@ vsql -d test01
 | `sm4_c_decrypt_cbc(bytea, key, iv)`            | CBC模式解密，返回text             |
 | `sm4_c_encrypt_cbc_kdf(text, password, algo)`  | **CBC+KDF加密**，支持密钥派生 🔥  |
 | `sm4_c_decrypt_cbc_kdf(bytea, password, algo)` | **CBC+KDF解密**，支持密钥派生 🔥  |
-| `sm4_c_encrypt_cbc_gs(text, password, algo)`   | **兼容gs_encrypt格式加密** 🎯     |
-| `sm4_c_decrypt_cbc_gs(text, password)`         | **兼容gs_encrypt格式解密** 🎯     |
+| `sm4_c_encrypt_cbc_gs(text, password, algo)`   | **兼容DWS gs_encrypt格式加密** 🎯     |
+| `sm4_c_decrypt_cbc_gs(text, password)`         | **兼容DWS gs_encrypt格式解密** 🎯     |
 | `sm4_c_encrypt_gcm(text, key, iv, aad)`        | GCM模式加密，返回密文+Tag(bytea)  |
 | `sm4_c_decrypt_gcm(bytea, key, iv, aad)`       | GCM模式解密，返回text             |
 | `sm4_c_encrypt_gcm_base64(text, key, iv, aad)` | GCM模式加密，返回Base64编码(text) |
@@ -220,14 +220,14 @@ vsql -d test01
 - 因为每次生成的随机盐值不同
 - 这是安全特性，防止彩虹表攻击
 
-### 🎯 新增：兼容 VastBase gs_encrypt 格式
+### 🎯 新增：兼容 DWS gs_encrypt 格式
 
 **特性**：
-- ✅ 完全兼容 VastBase `gs_encrypt` 函数格式
+- ✅ 完全兼容 DWS `gs_encrypt` 函数格式
 - ✅ 支持 SHA256/SHA384/SHA512/SM3 哈希算法
 - ✅ Base64 编码输出，与数据库一致
 - ✅ 自动识别算法类型，无需指定
-- ✅ 可解密 `gs_encrypt` 加密的数据
+- ✅ 可解密 DWS `gs_encrypt` 加密的数据
 
 **函数说明**：
 ```sql
@@ -401,9 +401,9 @@ vsql -d test01 -f demo_citizen_data.sql
 | 密钥强化 | 无 | PBKDF2 10,000次迭代 | PBKDF2 10,000次迭代 |
 | 输出格式 | bytea | bytea | Base64 text |
 | 元数据 | 无 | 仅盐值 | 版本+算法+盐值 |
-| 兼容性 | 标准实现 | 开源标准 | **VastBase 兼容** |
+| 兼容性 | 标准实现 | 开源标准 | **DWS 兼容** |
 | 安全性 | 依赖密钥管理 | 密码派生增强 | 密码派生增强 |
-| 适用场景 | 密钥已安全管理 | 基于密码的加密 | **与gs_encrypt互操作** |
+| 适用场景 | 密钥已安全管理 | 基于密码的加密 | **与DWS gs_encrypt互操作** |
 | 使用示例 | `sm4_c_encrypt_cbc()` | `sm4_c_encrypt_cbc_kdf()` | `sm4_c_encrypt_cbc_gs()` |
 
 ## 注意事项

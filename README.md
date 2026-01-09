@@ -152,7 +152,7 @@ sm4_c_decrypt_cbc_kdf(bytea, password, hash_algo) RETURNS text
   -- 使用PBKDF2从密码派生密钥和IV（10,000次迭代）
   -- 自动生成随机盐值，无需手动管理密钥/IV
 
--- 🎯 兼容VastBase gs_encrypt格式
+-- 🎯 兼容DWS gs_encrypt格式
 sm4_c_encrypt_cbc_gs(text, password, hash_algo) RETURNS text  -- Base64
 sm4_c_decrypt_cbc_gs(text, password) RETURNS text  -- 自动识别算法
 
@@ -196,6 +196,16 @@ SELECT sm4_c_decrypt_cbc_kdf(
     '中文密码',
     'sm3'
 );
+
+-- 🎯 GS格式兼容示例
+-- 加密（生成DWS gs_encrypt格式）
+SELECT sm4_c_encrypt_cbc_gs('Hello World!', '1234567890123456', 'sha256');
+
+-- 解密DWS gs_encrypt加密的数据
+SELECT sm4_c_decrypt_cbc_gs(
+    'AwAAAAAAAAChP0tyh4nwLniN0WHlBFRMPD0qMvXaiNiZbvg/scBf48YKuse1HhuqmUy91ZVEGGzWBt1D1IHRHRTgSjbgCDG7s8lBRwo06umf4qKLufbp0Q==',
+    '1234567890123456'
+);
 ```
 
 ### C扩展应用场景
@@ -206,9 +216,9 @@ SELECT sm4_c_decrypt_cbc_kdf(
 - ✅ 政务系统数据安全
 - 🔥 **基于密码的加密（使用KDF）**
 - 🔥 **多哈希算法支持（SHA256/384/512/SM3）**
+- 🎯 **与DWS gs_encrypt函数互操作**
 
-**详细文档**: 查看 [sm4_c/README.md](sm4_c/README.md)  
-**KDF功能详解**: 查看 [sm4_c/USAGE_KDF.md](sm4_c/USAGE_KDF.md)
+**详细文档**: 查看 [sm4_c/README.md](sm4_c/README.md)
 
 ---
 
