@@ -667,7 +667,7 @@ int sm4_gcm_decrypt(const uint8_t *key, const uint8_t *iv, size_t iv_len,
 
 #ifdef USE_OPENSSL_KDF
 /*
- * 使用PBKDF2派生密钥和IV
+ * 使用PBKDF2派生密钥和IV（用于KDF功能）
  */
 static int derive_key_and_iv(
     const uint8_t *password,
@@ -679,9 +679,8 @@ static int derive_key_and_iv(
     uint8_t *iv)
 {
     const EVP_MD *md = NULL;
-    uint8_t derived[32];  /* 16字节密钥 + 16字节IV */
-    /* DWS gs_encrypt 使用 8192 次迭代 (2^13) */
-    int iterations = 8192;
+    uint8_t derived[32];
+    int iterations = 10000;
 
     /* 选择哈希算法 */
     if (strcmp(hash_algo, "sha256") == 0) {
@@ -694,10 +693,10 @@ static int derive_key_and_iv(
 #if OPENSSL_VERSION_NUMBER >= 0x30000000L
         md = EVP_sm3();
 #else
-        return -1;  /* OpenSSL < 3.0 不支持SM3 */
+        return -1;
 #endif
     } else {
-        return -1;  /* 不支持的哈希算法 */
+        return -1;
     }
 
     /* 使用PBKDF2派生密钥材料 */
@@ -706,18 +705,62 @@ static int derive_key_and_iv(
             salt, salt_len,
             iterations,
             md,
-            32,  /* 输出32字节：16字节密钥 + 16字节IV */
+            32,
             derived) != 1) {
         return -1;
     }
 
-    /* 分离密钥和IV */
     memcpy(key, derived, 16);
     memcpy(iv, derived + 16, 16);
-
-    /* 清理敏感数据 */
     memset(derived, 0, sizeof(derived));
 
+    return 0;
+}
+
+/*
+ * DWS gs_encrypt 密钥派生（测试版本）
+ * 尝试多种可能的密钥派生方式
+ */
+static int derive_key_and_iv_dws(
+    const uint8_t *password,
+    size_t password_len,
+    const uint8_t *salt,
+    size_t salt_len,
+    const char *hash_algo,
+    uint8_t *key,
+    uint8_t *iv)
+{
+    const EVP_MD *md = NULL;
+    uint8_t derived[32];
+    
+    /* 选择哈希算法 */
+    if (strcmp(hash_algo, "sha256") == 0) {
+        md = EVP_sha256();
+    } else if (strcmp(hash_algo, "sha384") == 0) {
+        md = EVP_sha384();
+    } else if (strcmp(hash_algo, "sha512") == 0) {
+        md = EVP_sha512();
+    } else if (strcmp(hash_algo, "sm3") == 0) {
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+        md = EVP_sm3();
+#else
+        return -1;
+#endif
+    } else {
+        return -1;
+    }
+
+    /* 方法1: 直接使用密码（填充或截断到16字节） + 盐值作为IV */
+    memset(key, 0, 16);
+    memset(iv, 0, 16);
+    
+    if (password_len >= 16) {
+        memcpy(key, password, 16);
+    } else {
+        memcpy(key, password, password_len);
+    }
+    memcpy(iv, salt, 16);
+    
     return 0;
 }
 
@@ -934,9 +977,9 @@ int sm4_cbc_encrypt_gs_format(
         return -1;
     }
 
-    /* 派生密钥和IV */
-    if (derive_key_and_iv(password, password_len, salt, sizeof(salt),
-                          hash_algo, key, iv) != 0) {
+    /* 派生密钥和IV - 使用DWS密钥派生方式 */
+    if (derive_key_and_iv_dws(password, password_len, salt, sizeof(salt),
+                              hash_algo, key, iv) != 0) {
         return -1;
     }
 
@@ -1032,9 +1075,9 @@ int sm4_cbc_decrypt_gs_format(
     ciphertext = binary_data + 24;
     cipher_len = binary_len - 24;
 
-    /* 派生密钥和IV */
-    if (derive_key_and_iv(password, password_len, salt, 16,
-                          hash_algo, key, iv) != 0) {
+    /* 派生密钥和IV - 使用DWS密钥派生方式 */
+    if (derive_key_and_iv_dws(password, password_len, salt, 16,
+                              hash_algo, key, iv) != 0) {
         free(binary_data);
         return -1;
     }
