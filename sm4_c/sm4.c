@@ -1037,6 +1037,12 @@ int sm4_cbc_decrypt_gs_format(
     version = binary_data[0];
     hash_type = binary_data[1];
 
+    /* 验证版本号 */
+    if (version != 0x03) {
+        free(binary_data);
+        return -1;  /* 不支持的版本 */
+    }
+
     /* 根据 hash_type 选择算法 */
     switch (hash_type) {
         case 0: hash_algo = "sha256"; break;
