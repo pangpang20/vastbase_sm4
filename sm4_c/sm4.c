@@ -680,7 +680,8 @@ static int derive_key_and_iv(
 {
     const EVP_MD *md = NULL;
     uint8_t derived[32];  /* 16字节密钥 + 16字节IV */
-    int iterations = 10000;  /* PBKDF2迭代次数 */
+    /* DWS gs_encrypt 使用 8192 次迭代 (2^13) */
+    int iterations = 8192;
 
     /* 选择哈希算法 */
     if (strcmp(hash_algo, "sha256") == 0) {

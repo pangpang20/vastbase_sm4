@@ -149,7 +149,7 @@ sm4_c_decrypt_cbc(bytea, text, text) RETURNS text
 sm4_c_encrypt_cbc_kdf(text, password, hash_algo) RETURNS bytea
 sm4_c_decrypt_cbc_kdf(bytea, password, hash_algo) RETURNS text
   -- hash_algo: 'sha256' | 'sha384' | 'sha512' | 'sm3'
-  -- 使用PBKDF2从密码派生密钥和IV（10,000次迭代）
+  -- 使用PBKDF2从密码派生密钥和IV（8,192次迭代）
   -- 自动生成随机盐值，无需手动管理密钥/IV
 
 -- 🎯 兼容DWS gs_encrypt格式
