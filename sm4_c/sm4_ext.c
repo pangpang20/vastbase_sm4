@@ -26,6 +26,8 @@ PG_FUNCTION_INFO_V1(sm4_encrypt_gcm_base64);
 PG_FUNCTION_INFO_V1(sm4_decrypt_gcm_base64);
 PG_FUNCTION_INFO_V1(sm4_encrypt_cbc_kdf);
 PG_FUNCTION_INFO_V1(sm4_decrypt_cbc_kdf);
+PG_FUNCTION_INFO_V1(sm4_encrypt_cbc_gs);
+PG_FUNCTION_INFO_V1(sm4_decrypt_cbc_gs);
 
 /* 工具函数: 十六进制字符串转字节数组 */
 static int hex_to_bytes(const char *hex, size_t hex_len, uint8_t *bytes, size_t *bytes_len)
@@ -1124,6 +1126,129 @@ sm4_decrypt_cbc_kdf(PG_FUNCTION_ARGS)
 
     pfree(pass_str);
     pfree(hash_algo);
+    pfree(plain);
+
+    PG_RETURN_TEXT_P(result);
+}
+
+/*
+ * sm4_encrypt_cbc_gs(plaintext text, password text, hash_algo text) -> text
+ * CBC模式加密，兼容gs_encrypt格式，返回Base64
+ */
+extern "C" Datum
+sm4_encrypt_cbc_gs(PG_FUNCTION_ARGS)
+{
+    text *plaintext = PG_GETARG_TEXT_PP(0);
+    text *password = PG_GETARG_TEXT_PP(1);
+    text *hash_algo_text = PG_GETARG_TEXT_PP(2);
+    char *plain_str;
+    char *pass_str;
+    char *hash_algo;
+    size_t plain_len;
+    size_t pass_len;
+    size_t output_len;
+    char *output;
+    text *result;
+
+    /* 获取明文 */
+    plain_str = text_to_cstring(plaintext);
+    plain_len = strlen(plain_str);
+
+    /* 获取密码 */
+    pass_str = text_to_cstring(password);
+    pass_len = strlen(pass_str);
+
+    /* 获取哈希算法 */
+    hash_algo = text_to_cstring(hash_algo_text);
+
+    /* 验证哈希算法 */
+    if (strcmp(hash_algo, "sha256") != 0 &&
+        strcmp(hash_algo, "sha384") != 0 &&
+        strcmp(hash_algo, "sha512") != 0 &&
+        strcmp(hash_algo, "sm3") != 0) {
+        pfree(plain_str);
+        pfree(pass_str);
+        pfree(hash_algo);
+        ereport(ERROR,
+                (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+                 errmsg("Hash algorithm must be one of: sha256, sha384, sha512, sm3")));
+    }
+
+    /* 分配输出缓冲区: Base64的长度需要更大 */
+    output_len = (plain_len + 48 + SM4_BLOCK_SIZE) * 2;  /* 预留足够空间 */
+    output = (char *)palloc(output_len);
+
+    /* 加密 */
+    if (sm4_cbc_encrypt_gs_format((uint8_t *)pass_str, pass_len, hash_algo,
+                                   (uint8_t *)plain_str, plain_len,
+                                   output, &output_len) != 0) {
+        pfree(plain_str);
+        pfree(pass_str);
+        pfree(hash_algo);
+        pfree(output);
+        ereport(ERROR,
+                (errcode(ERRCODE_INTERNAL_ERROR),
+                 errmsg("SM4 CBC GS format encryption failed")));
+    }
+
+    /* 构造text结果 */
+    result = cstring_to_text(output);
+
+    pfree(plain_str);
+    pfree(pass_str);
+    pfree(hash_algo);
+    pfree(output);
+
+    PG_RETURN_TEXT_P(result);
+}
+
+/*
+ * sm4_decrypt_cbc_gs(ciphertext text, password text) -> text
+ * CBC模式解密，兼容gs_encrypt格式，输入Base64
+ */
+extern "C" Datum
+sm4_decrypt_cbc_gs(PG_FUNCTION_ARGS)
+{
+    text *ciphertext = PG_GETARG_TEXT_PP(0);
+    text *password = PG_GETARG_TEXT_PP(1);
+    char *cipher_str;
+    size_t cipher_len;
+    char *pass_str;
+    size_t pass_len;
+    uint8_t *plain;
+    size_t plain_len;
+    text *result;
+
+    /* 获取密文 (Base64) */
+    cipher_str = text_to_cstring(ciphertext);
+    cipher_len = strlen(cipher_str);
+
+    /* 获取密码 */
+    pass_str = text_to_cstring(password);
+    pass_len = strlen(pass_str);
+
+    /* 分配明文缓冲区 */
+    plain = (uint8_t *)palloc(cipher_len);  /* Base64解码后会更小 */
+
+    /* 解密 */
+    if (sm4_cbc_decrypt_gs_format((uint8_t *)pass_str, pass_len,
+                                   (uint8_t *)cipher_str, cipher_len,
+                                   plain, &plain_len) != 0) {
+        pfree(cipher_str);
+        pfree(pass_str);
+        pfree(plain);
+        ereport(ERROR,
+                (errcode(ERRCODE_INTERNAL_ERROR),
+                 errmsg("SM4 CBC GS format decryption failed")));
+    }
+
+    plain[plain_len] = '\0';
+
+    /* 构造text结果 */
+    result = cstring_to_text((char *)plain);
+
+    pfree(cipher_str);
+    pfree(pass_str);
     pfree(plain);
 
     PG_RETURN_TEXT_P(result);

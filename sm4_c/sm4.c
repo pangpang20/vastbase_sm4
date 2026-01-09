@@ -823,4 +823,252 @@ int sm4_cbc_decrypt_kdf(
 
     return ret;
 }
+
+/* Base64 编码表 */
+static const char base64_table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+/* Base64 解码表 */
+static const uint8_t base64_decode_table[256] = {
+    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 62, 64, 64, 64, 63,
+    52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 64, 64, 64, 64, 64, 64,
+    64,  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14,
+    15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 64, 64, 64, 64, 64,
+    64, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
+    41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 64, 64, 64, 64, 64,
+    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64
+};
+
+/* Base64 编码函数 */
+static size_t base64_encode_internal(const uint8_t *data, size_t len, char *output)
+{
+    size_t i, j = 0;
+    uint32_t val;
+
+    for (i = 0; i < len; i += 3) {
+        val = (uint32_t)data[i] << 16;
+        if (i + 1 < len) val |= (uint32_t)data[i + 1] << 8;
+        if (i + 2 < len) val |= (uint32_t)data[i + 2];
+
+        output[j++] = base64_table[(val >> 18) & 0x3F];
+        output[j++] = base64_table[(val >> 12) & 0x3F];
+        output[j++] = (i + 1 < len) ? base64_table[(val >> 6) & 0x3F] : '=';
+        output[j++] = (i + 2 < len) ? base64_table[val & 0x3F] : '=';
+    }
+    output[j] = '\0';
+    return j;
+}
+
+/* Base64 解码函数 */
+static int base64_decode_internal(const uint8_t *input, size_t len, uint8_t *output, size_t *out_len)
+{
+    size_t i, j = 0;
+    uint32_t val;
+    size_t padding = 0;
+
+    if (len % 4 != 0) {
+        return -1;
+    }
+
+    if (len >= 2 && input[len - 1] == '=') padding++;
+    if (len >= 2 && input[len - 2] == '=') padding++;
+
+    *out_len = (len / 4) * 3 - padding;
+
+    for (i = 0; i < len; i += 4) {
+        val = 0;
+        val |= base64_decode_table[input[i]] << 18;
+        val |= base64_decode_table[input[i + 1]] << 12;
+        if (input[i + 2] != '=') val |= base64_decode_table[input[i + 2]] << 6;
+        if (input[i + 3] != '=') val |= base64_decode_table[input[i + 3]];
+
+        output[j++] = (val >> 16) & 0xFF;
+        if (input[i + 2] != '=' && j < *out_len) output[j++] = (val >> 8) & 0xFF;
+        if (input[i + 3] != '=' && j < *out_len) output[j++] = val & 0xFF;
+    }
+
+    return 0;
+}
+
+/*
+ * SM4 CBC模式加密（兼容gs_encrypt格式）
+ * 输出格式: Base64(version[1] + hash_type[1] + reserved[6] + salt[16] + ciphertext)
+ */
+int sm4_cbc_encrypt_gs_format(
+    const uint8_t *password,
+    size_t password_len,
+    const char *hash_algo,
+    const uint8_t *input,
+    size_t input_len,
+    char *output,
+    size_t *output_len)
+{
+    uint8_t header[8];  /* version(1) + hash_type(1) + reserved(6) */
+    uint8_t salt[16];
+    uint8_t key[SM4_KEY_SIZE];
+    uint8_t iv[SM4_BLOCK_SIZE];
+    uint8_t *binary_output;
+    size_t cipher_len;
+    size_t total_len;
+    uint8_t hash_type;
+    int ret;
+
+    if (!password || !hash_algo || !input || !output || !output_len) {
+        return -1;
+    }
+
+    /* 设置版本号 */
+    header[0] = 0x03;  /* 版本 3 */
+
+    /* 设置哈希算法类型 */
+    if (strcmp(hash_algo, "sha256") == 0) {
+        hash_type = 0;
+    } else if (strcmp(hash_algo, "sha384") == 0) {
+        hash_type = 1;
+    } else if (strcmp(hash_algo, "sha512") == 0) {
+        hash_type = 2;
+    } else if (strcmp(hash_algo, "sm3") == 0) {
+        hash_type = 3;
+    } else {
+        return -1;
+    }
+    header[1] = hash_type;
+
+    /* 保留字段填零 */
+    memset(header + 2, 0, 6);
+
+    /* 生成随机盐值 */
+    if (RAND_bytes(salt, sizeof(salt)) != 1) {
+        return -1;
+    }
+
+    /* 派生密钥和IV */
+    if (derive_key_and_iv(password, password_len, salt, sizeof(salt),
+                          hash_algo, key, iv) != 0) {
+        return -1;
+    }
+
+    /* 分配二进制输出缓冲区: header(8) + salt(16) + ciphertext */
+    cipher_len = input_len + SM4_BLOCK_SIZE;  /* 最大填充后长度 */
+    binary_output = (uint8_t *)malloc(8 + 16 + cipher_len);
+    if (!binary_output) {
+        return -1;
+    }
+
+    /* 拷贝 header 和 salt */
+    memcpy(binary_output, header, 8);
+    memcpy(binary_output + 8, salt, 16);
+
+    /* 使用标准CBC加密 */
+    ret = sm4_cbc_encrypt(key, iv, input, input_len,
+                          binary_output + 24, &cipher_len);
+
+    /* 清理敏感数据 */
+    memset(key, 0, sizeof(key));
+    memset(iv, 0, sizeof(iv));
+
+    if (ret != 0) {
+        free(binary_output);
+        return -1;
+    }
+
+    total_len = 24 + cipher_len;  /* header(8) + salt(16) + ciphertext */
+
+    /* Base64编码 */
+    *output_len = base64_encode_internal(binary_output, total_len, output);
+
+    free(binary_output);
+    return 0;
+}
+
+/*
+ * SM4 CBC模式解密（兼容gs_encrypt格式）
+ * 输入格式: Base64(version[1] + hash_type[1] + reserved[6] + salt[16] + ciphertext)
+ */
+int sm4_cbc_decrypt_gs_format(
+    const uint8_t *password,
+    size_t password_len,
+    const uint8_t *input,
+    size_t input_len,
+    uint8_t *output,
+    size_t *output_len)
+{
+    uint8_t *binary_data;
+    size_t binary_len;
+    uint8_t version, hash_type;
+    const char *hash_algo;
+    const uint8_t *salt;
+    const uint8_t *ciphertext;
+    size_t cipher_len;
+    uint8_t key[SM4_KEY_SIZE];
+    uint8_t iv[SM4_BLOCK_SIZE];
+    int ret;
+
+    if (!password || !input || !output || !output_len) {
+        return -1;
+    }
+
+    /* Base64解码 */
+    binary_data = (uint8_t *)malloc(input_len);  /* 分配足够的空间 */
+    if (!binary_data) {
+        return -1;
+    }
+
+    if (base64_decode_internal(input, input_len, binary_data, &binary_len) != 0) {
+        free(binary_data);
+        return -1;
+    }
+
+    /* 检查最小长度: header(8) + salt(16) + 至少一个块(16) */
+    if (binary_len < 40) {
+        free(binary_data);
+        return -1;
+    }
+
+    /* 解析 header */
+    version = binary_data[0];
+    hash_type = binary_data[1];
+
+    /* 根据 hash_type 选择算法 */
+    switch (hash_type) {
+        case 0: hash_algo = "sha256"; break;
+        case 1: hash_algo = "sha384"; break;
+        case 2: hash_algo = "sha512"; break;
+        case 3: hash_algo = "sm3"; break;
+        default:
+            free(binary_data);
+            return -1;
+    }
+
+    /* 提取盐值和密文 */
+    salt = binary_data + 8;
+    ciphertext = binary_data + 24;
+    cipher_len = binary_len - 24;
+
+    /* 派生密钥和IV */
+    if (derive_key_and_iv(password, password_len, salt, 16,
+                          hash_algo, key, iv) != 0) {
+        free(binary_data);
+        return -1;
+    }
+
+    /* 使用标准CBC解密 */
+    ret = sm4_cbc_decrypt(key, iv, ciphertext, cipher_len,
+                          output, output_len);
+
+    /* 清理敏感数据 */
+    memset(key, 0, sizeof(key));
+    memset(iv, 0, sizeof(iv));
+    free(binary_data);
+
+    return ret;
+}
 #endif /* USE_OPENSSL_KDF */

@@ -105,6 +105,8 @@ sm4_c_decrypt_cbc_kdf(ciphertext bytea, password text, hash_algo text) -> text
 ### 基本加解密
 
 ```sql
+vsql -d test01 -r
+
 -- SHA256 加密
 SELECT encode(sm4_c_encrypt_cbc_kdf('Hello World!', 'mypassword', 'sha256'), 'hex');
 

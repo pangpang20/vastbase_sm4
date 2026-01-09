@@ -162,4 +162,34 @@ int sm4_cbc_decrypt_kdf(const uint8_t *password, size_t password_len,
                         const uint8_t *input, size_t input_len,
                         uint8_t *output, size_t *output_len);
 
+/*
+ * SM4 CBC模式加密（兼容gs_encrypt格式）
+ * @param password: 原始密码/密钥
+ * @param password_len: 密码长度
+ * @param hash_algo: 哈希算法名称 ("sha256", "sha384", "sha512", "sm3")
+ * @param input: 输入数据
+ * @param input_len: 输入长度
+ * @param output: 输出缓冲区（包含：header + salt + ciphertext，Base64编码）
+ * @param output_len: 输出长度指针
+ * @return: 0成功，-1失败
+ */
+int sm4_cbc_encrypt_gs_format(const uint8_t *password, size_t password_len,
+                               const char *hash_algo,
+                               const uint8_t *input, size_t input_len,
+                               char *output, size_t *output_len);
+
+/*
+ * SM4 CBC模式解密（兼容gs_encrypt格式）
+ * @param password: 原始密码/密钥
+ * @param password_len: 密码长度
+ * @param input: 输入数据（Base64编码的gs_encrypt格式）
+ * @param input_len: 输入长度
+ * @param output: 输出缓冲区
+ * @param output_len: 输出长度指针
+ * @return: 0成功，-1失败
+ */
+int sm4_cbc_decrypt_gs_format(const uint8_t *password, size_t password_len,
+                               const uint8_t *input, size_t input_len,
+                               uint8_t *output, size_t *output_len);
+
 #endif /* SM4_H */

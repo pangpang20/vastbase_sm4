@@ -173,6 +173,8 @@ vsql -d test01
 | `sm4_c_decrypt_cbc(bytea, key, iv)`            | CBC模式解密，返回text             |
 | `sm4_c_encrypt_cbc_kdf(text, password, algo)`  | **CBC+KDF加密**，支持密钥派生 🔥  |
 | `sm4_c_decrypt_cbc_kdf(bytea, password, algo)` | **CBC+KDF解密**，支持密钥派生 🔥  |
+| `sm4_c_encrypt_cbc_gs(text, password, algo)`   | **兼容gs_encrypt格式加密** 🎯     |
+| `sm4_c_decrypt_cbc_gs(text, password)`         | **兼容gs_encrypt格式解密** 🎯     |
 | `sm4_c_encrypt_gcm(text, key, iv, aad)`        | GCM模式加密，返回密文+Tag(bytea)  |
 | `sm4_c_decrypt_gcm(bytea, key, iv, aad)`       | GCM模式解密，返回text             |
 | `sm4_c_encrypt_gcm_base64(text, key, iv, aad)` | GCM模式加密，返回Base64编码(text) |
@@ -204,6 +206,53 @@ vsql -d test01
 **输出格式**：`[盐值 16字节] + [SM4 CBC 密文]`
 
 **详细文档**：请参考 [USAGE_KDF.md](USAGE_KDF.md)
+
+### 🎯 新增：兼容 VastBase gs_encrypt 格式
+
+**特性**：
+- ✅ 完全兼容 VastBase `gs_encrypt` 函数格式
+- ✅ 支持 SHA256/SHA384/SHA512/SM3 哈希算法
+- ✅ Base64 编码输出，与数据库一致
+- ✅ 自动识别算法类型，无需指定
+- ✅ 可解密 `gs_encrypt` 加密的数据
+
+**函数说明**：
+```sql
+-- 加密（需指定哈希算法）
+sm4_c_encrypt_cbc_gs(plaintext, password, hash_algo) -> text (Base64)
+
+-- 解密（自动识别算法）
+sm4_c_decrypt_cbc_gs(ciphertext_base64, password) -> text
+```
+
+**数据格式**：
+```
+Base64([版本号 1字节] + [算法类型 1字节] + [保留 6字节] + [盐值 16字节] + [密文])
+
+版本号: 0x03
+算法类型: 0=SHA256, 1=SHA384, 2=SHA512, 3=SM3
+```
+
+**使用示例**：
+```sql
+-- 使用 GS 格式加密
+SELECT sm4_c_encrypt_cbc_gs('Hello World!', '1234567890123456', 'sha256');
+-- 输出: AwAAAAAAAA... (Base64)
+
+-- 解密 GS 格式数据
+SELECT sm4_c_decrypt_cbc_gs(
+    'AwAAAAAAAAChP0tyh4nwLniN0WHlBFRMPD0qMvXaiNiZbvg/scBf48YKuse1HhuqmUy91ZVEGGzWBt1D1IHRHRTgSjbgCDG7s8lBRwo06umf4qKLufbp0Q==',
+    '1234567890123456'
+);
+
+-- 加解密验证
+SELECT sm4_c_decrypt_cbc_gs(
+    sm4_c_encrypt_cbc_gs('Test Data', 'password', 'sha256'),
+    'password'
+);
+```
+
+**测试脚本**：`test_sm4_gs_compat.sql`
 
 ## 运行示例
 
@@ -324,20 +373,25 @@ vsql -d test01 -f test_sm4_gcm.sql
 
 vsql -d test01 -f test_sm4_cbc_kdf.sql  -- KDF模式测试
 
+vsql -d test01 -f test_sm4_gs_compat.sql  -- GS格式兼容性测试
+
 vsql -d test01 -f demo_citizen_data.sql
 ```
 
-## CBC KDF vs 标准 CBC 对比
+## 加密模式对比
 
-| 特性 | 标准 CBC | CBC KDF（密钥派生） |
-|------|---------|--------------------|
-| 密钥输入 | 16字节固定密钥 | 任意长度密码 |
-| IV管理 | 手动提供16字节IV | 自动派生 |
-| 盐值 | 无 | 自动生成并包含在输出 |
-| 密钥强化 | 无 | PBKDF2 10,000次迭代 |
-| 安全性 | 依赖密钥管理 | 密码派生增强 |
-| 适用场景 | 密钥已安全管理 | 基于密码的加密 |
-| 使用示例 | `sm4_c_encrypt_cbc()` | `sm4_c_encrypt_cbc_kdf()` |
+| 特性 | 标准 CBC | CBC KDF（密钥派生） | CBC GS（兼容格式） |
+|------|---------|--------------------|--------------------|
+| 密钥输入 | 16字节固定密钥 | 任意长度密码 | 任意长度密码 |
+| IV管理 | 手动提供16字节IV | 自动派生 | 自动派生 |
+| 盐值 | 无 | 自动生成并包含在输出 | 自动生成并包含在输出 |
+| 密钥强化 | 无 | PBKDF2 10,000次迭代 | PBKDF2 10,000次迭代 |
+| 输出格式 | bytea | bytea | Base64 text |
+| 元数据 | 无 | 仅盐值 | 版本+算法+盐值 |
+| 兼容性 | 标准实现 | 开源标准 | **VastBase 兼容** |
+| 安全性 | 依赖密钥管理 | 密码派生增强 | 密码派生增强 |
+| 适用场景 | 密钥已安全管理 | 基于密码的加密 | **与gs_encrypt互操作** |
+| 使用示例 | `sm4_c_encrypt_cbc()` | `sm4_c_encrypt_cbc_kdf()` | `sm4_c_encrypt_cbc_gs()` |
 
 ## 相关文档
 
