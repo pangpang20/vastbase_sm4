@@ -1051,15 +1051,33 @@ int sm4_cbc_encrypt_gs_format(
     uint8_t salt[16];
     uint8_t key[SM4_KEY_SIZE];
     uint8_t iv[SM4_BLOCK_SIZE];
+    uint8_t hmac_key[SM4_KEY_SIZE];  /* HMAC密钥 */
+    uint8_t hmac_value[64];  /* HMAC值（最大64字节用于sha512） */
+    unsigned int hmac_len;
     uint8_t *binary_output;
-    uint8_t *plaintext_with_random;
-    size_t plaintext_total_len;
     size_t cipher_len;
     size_t total_len;
     int ret;
-    const size_t RANDOM_PREFIX_LEN = 56;  /* DWS在明文前添加56字节随机数据（第3次测试） */
+    const EVP_MD *md = NULL;
 
     if (!password || !hash_algo || !input || !output || !output_len) {
+        return -1;
+    }
+
+    /* 选择哈希算法 */
+    if (strcmp(hash_algo, "sha256") == 0) {
+        md = EVP_sha256();
+        hmac_len = 32;
+    } else if (strcmp(hash_algo, "sha384") == 0) {
+        md = EVP_sha384();
+        hmac_len = 48;
+    } else if (strcmp(hash_algo, "sha512") == 0) {
+        md = EVP_sha512();
+        hmac_len = 64;
+    } else if (strcmp(hash_algo, "sm3") == 0) {
+        md = EVP_sm3();
+        hmac_len = 32;
+    } else {
         return -1;
     }
 
@@ -1067,62 +1085,78 @@ int sm4_cbc_encrypt_gs_format(
     header[0] = 0x03;  /* 版本 3 */
     memset(header + 1, 0, 7);  /* 保留字段全零 */
 
-    /* DWS使用固定盐值（通过逆向工程发现） */
-    const uint8_t fixed_salt[16] = {
-        0xfc, 0xc2, 0xa7, 0x39, 0x72, 0x4d, 0xb4, 0x09,
-        0xa3, 0xf6, 0x0e, 0xab, 0x11, 0xd9, 0xd9, 0xdb
-    };
-    memcpy(salt, fixed_salt, 16);
-
-    /* 派生密钥和IV - 使用DWS密钥派生方式 */
-    if (derive_key_and_iv_dws(password, password_len, salt, sizeof(salt),
-                              hash_algo, key, iv) != 0) {
+    /* 生成随机盐值 */
+    if (RAND_bytes(salt, sizeof(salt)) != 1) {
         return -1;
     }
 
-    /* 准备明文：48字节随机数据 + 原始明文 */
-    plaintext_total_len = RANDOM_PREFIX_LEN + input_len;
-    plaintext_with_random = (uint8_t *)malloc(plaintext_total_len);
-    if (!plaintext_with_random) {
+    /* 派生加密密钥和IV - 使用EVP_BytesToKey */
+    if (EVP_BytesToKey(EVP_sm4_cbc(), md, salt,
+                       password, password_len, 1,
+                       key, iv) != 16) {
         return -1;
     }
 
-    /* 生成48字节随机前缀 */
-    if (RAND_bytes(plaintext_with_random, RANDOM_PREFIX_LEN) != 1) {
-        free(plaintext_with_random);
+    /* 派生HMAC密钥（使用相同方法但不同轮次） */
+    if (EVP_BytesToKey(EVP_sm4_cbc(), md, salt,
+                       password, password_len, 2,
+                       hmac_key, NULL) != 16) {
         return -1;
     }
 
-    /* 拷贝原始明文 */
-    memcpy(plaintext_with_random + RANDOM_PREFIX_LEN, input, input_len);
+    /* 分配密文缓冲区 */
+    cipher_len = input_len + SM4_BLOCK_SIZE;  /* 最大填充后长度 */
+    uint8_t *ciphertext = (uint8_t *)malloc(cipher_len);
+    if (!ciphertext) {
+        return -1;
+    }
 
-    /* 分配二进制输出缓冲区: header(8) + salt(16) + ciphertext */
-    cipher_len = plaintext_total_len + SM4_BLOCK_SIZE;  /* 最大填充后长度 */
-    binary_output = (uint8_t *)malloc(8 + 16 + cipher_len);
+    /* 使用标准CBC加密明文 */
+    ret = sm4_cbc_encrypt(key, iv, input, input_len, ciphertext, &cipher_len);
+    if (ret != 0) {
+        free(ciphertext);
+        return -1;
+    }
+
+    /* 计算HMAC: HMAC(header + salt + ciphertext) */
+    size_t data_for_hmac_len = 8 + 16 + cipher_len;
+    uint8_t *data_for_hmac = (uint8_t *)malloc(data_for_hmac_len);
+    if (!data_for_hmac) {
+        free(ciphertext);
+        return -1;
+    }
+    memcpy(data_for_hmac, header, 8);
+    memcpy(data_for_hmac + 8, salt, 16);
+    memcpy(data_for_hmac + 24, ciphertext, cipher_len);
+
+    unsigned int actual_hmac_len = hmac_len;
+    if (HMAC(md, hmac_key, sizeof(hmac_key),
+             data_for_hmac, data_for_hmac_len,
+             hmac_value, &actual_hmac_len) == NULL) {
+        free(data_for_hmac);
+        free(ciphertext);
+        return -1;
+    }
+    free(data_for_hmac);
+
+    /* 组装输出: header(8) + salt(16) + HMAC(32/48/64) + ciphertext */
+    total_len = 8 + 16 + hmac_len + cipher_len;
+    binary_output = (uint8_t *)malloc(total_len);
     if (!binary_output) {
-        free(plaintext_with_random);
+        free(ciphertext);
         return -1;
     }
 
-    /* 拷贝 header 和 salt */
     memcpy(binary_output, header, 8);
     memcpy(binary_output + 8, salt, 16);
-
-    /* 使用标准CBC加密（包含随机前缀的明文） */
-    ret = sm4_cbc_encrypt(key, iv, plaintext_with_random, plaintext_total_len,
-                          binary_output + 24, &cipher_len);
+    memcpy(binary_output + 24, hmac_value, hmac_len);
+    memcpy(binary_output + 24 + hmac_len, ciphertext, cipher_len);
 
     /* 清理敏感数据 */
     memset(key, 0, sizeof(key));
     memset(iv, 0, sizeof(iv));
-    free(plaintext_with_random);
-
-    if (ret != 0) {
-        free(binary_output);
-        return -1;
-    }
-
-    total_len = 24 + cipher_len;  /* header(8) + salt(16) + ciphertext */
+    memset(hmac_key, 0, sizeof(hmac_key));
+    free(ciphertext);
 
     /* Base64编码 */
     *output_len = base64_encode_internal(binary_output, total_len, output);
@@ -1133,7 +1167,7 @@ int sm4_cbc_encrypt_gs_format(
 
 /*
  * SM4 CBC模式解密（兼容gs_encrypt格式）
- * 输入格式: Base64(version[1] + reserved[7] + salt[16] + ciphertext)
+ * 输入格式: Base64(version[1] + reserved[7] + salt[16] + HMAC[32/48/64] + ciphertext)
  * 注意：DWS格式不在数据中存储哈希算法，需要通过参数指定
  */
 int sm4_cbc_decrypt_gs_format(
@@ -1149,13 +1183,35 @@ int sm4_cbc_decrypt_gs_format(
     size_t binary_len;
     uint8_t version;
     const uint8_t *salt;
+    const uint8_t *hmac_received;
     const uint8_t *ciphertext;
     size_t cipher_len;
     uint8_t key[SM4_KEY_SIZE];
     uint8_t iv[SM4_BLOCK_SIZE];
+    uint8_t hmac_key[SM4_KEY_SIZE];
+    uint8_t hmac_computed[64];
+    unsigned int hmac_len;
     int ret;
+    const EVP_MD *md = NULL;
 
     if (!password || !hash_algo || !input || !output || !output_len) {
+        return -1;
+    }
+
+    /* 选择哈希算法 */
+    if (strcmp(hash_algo, "sha256") == 0) {
+        md = EVP_sha256();
+        hmac_len = 32;
+    } else if (strcmp(hash_algo, "sha384") == 0) {
+        md = EVP_sha384();
+        hmac_len = 48;
+    } else if (strcmp(hash_algo, "sha512") == 0) {
+        md = EVP_sha512();
+        hmac_len = 64;
+    } else if (strcmp(hash_algo, "sm3") == 0) {
+        md = EVP_sm3();
+        hmac_len = 32;
+    } else {
         return -1;
     }
 
@@ -1170,8 +1226,8 @@ int sm4_cbc_decrypt_gs_format(
         return -1;
     }
 
-    /* 检查最小长度: header(8) + salt(16) + 至少一个块(16) */
-    if (binary_len < 40) {
+    /* 检查最小长度: header(8) + salt(16) + HMAC(32) + 至少一个块(16) */
+    if (binary_len < (8 + 16 + hmac_len + 16)) {
         free(binary_data);
         return -1;
     }
@@ -1185,53 +1241,81 @@ int sm4_cbc_decrypt_gs_format(
         return -1;  /* 不支持的版本 */
     }
 
-    /* 提取盐值和密文 */
+    /* 提取盐值、HMAC和密文 */
     salt = binary_data + 8;
-    ciphertext = binary_data + 24;
-    cipher_len = binary_len - 24;
+    hmac_received = binary_data + 24;
+    ciphertext = binary_data + 24 + hmac_len;
+    cipher_len = binary_len - 24 - hmac_len;
 
-    /* 派生密钥和IV - 使用DWS密钥派生方式 */
-    if (derive_key_and_iv_dws(password, password_len, salt, 16,
-                              hash_algo, key, iv) != 0) {
+    /* 派生加密密钥和IV - 使用EVP_BytesToKey */
+    if (EVP_BytesToKey(EVP_sm4_cbc(), md, salt,
+                       password, password_len, 1,
+                       key, iv) != 16) {
         free(binary_data);
         return -1;
     }
+
+    /* 派生HMAC密钥 */
+    if (EVP_BytesToKey(EVP_sm4_cbc(), md, salt,
+                       password, password_len, 2,
+                       hmac_key, NULL) != 16) {
+        free(binary_data);
+        return -1;
+    }
+
+    /* 验证HMAC: HMAC(header + salt + ciphertext) */
+    size_t data_for_hmac_len = 8 + 16 + cipher_len;
+    uint8_t *data_for_hmac = (uint8_t *)malloc(data_for_hmac_len);
+    if (!data_for_hmac) {
+        free(binary_data);
+        return -1;
+    }
+    memcpy(data_for_hmac, binary_data, 8);  /* header */
+    memcpy(data_for_hmac + 8, salt, 16);    /* salt */
+    memcpy(data_for_hmac + 24, ciphertext, cipher_len);  /* ciphertext */
+
+    unsigned int actual_hmac_len = hmac_len;
+    if (HMAC(md, hmac_key, sizeof(hmac_key),
+             data_for_hmac, data_for_hmac_len,
+             hmac_computed, &actual_hmac_len) == NULL) {
+        free(data_for_hmac);
+        free(binary_data);
+        return -1;
+    }
+    free(data_for_hmac);
+
+    /* 比较HMAC值 */
+    if (memcmp(hmac_received, hmac_computed, hmac_len) != 0) {
+        free(binary_data);
+        return -1;  /* HMAC验证失败 */
+    }
     
-    /* 分配临时缓冲区用于解密（包含随机前缀） */
-    uint8_t *decrypted_with_random = (uint8_t *)malloc(cipher_len);
-    size_t decrypted_len;
-    const size_t RANDOM_PREFIX_LEN = 56;  /* DWS在明文前添加56字节随机数据（第3次测试） */
-        
-    if (!decrypted_with_random) {
+    /* 分配解密缓冲区 */
+    uint8_t *plaintext = (uint8_t *)malloc(cipher_len);
+    if (!plaintext) {
         free(binary_data);
         return -1;
     }
     
     /* 使用标准CBC解密 */
     ret = sm4_cbc_decrypt(key, iv, ciphertext, cipher_len,
-                          decrypted_with_random, &decrypted_len);
+                          plaintext, output_len);
     
     /* 清理敏感数据 */
     memset(key, 0, sizeof(key));
     memset(iv, 0, sizeof(iv));
+    memset(hmac_key, 0, sizeof(hmac_key));
     free(binary_data);
     
     if (ret != 0) {
-        free(decrypted_with_random);
+        free(plaintext);
         return ret;
     }
     
-    /* 检查解密后的数据长度是否足够 */
-    if (decrypted_len < RANDOM_PREFIX_LEN) {
-        free(decrypted_with_random);
-        return -1;  /* 数据太短，不符合DWS格式 */
-    }
+    /* 拷贝解密结果 */
+    memcpy(output, plaintext, *output_len);
+    free(plaintext);
     
-    /* 移除前48字节随机数据，提取原始明文 */
-    *output_len = decrypted_len - RANDOM_PREFIX_LEN;
-    memcpy(output, decrypted_with_random + RANDOM_PREFIX_LEN, *output_len);
-    
-    free(decrypted_with_random);
     return 0;
 }
 #endif /* USE_OPENSSL_KDF */
