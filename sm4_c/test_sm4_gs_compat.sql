@@ -1,5 +1,5 @@
 -- SM4 GS格式兼容性测试脚本
--- 测试与VastBase gs_encrypt格式的兼容性
+-- 测试与DWS gs_encrypt格式的兼容性
 
 \echo '========================================='
 \echo 'SM4 GS格式兼容性测试'
@@ -49,7 +49,7 @@ SELECT sm4_c_decrypt_cbc_gs(
 ) AS sm3_result;
 
 \echo ''
-\echo '6. 测试解密 VastBase gs_encrypt 的数据'
+\echo '6. 测试解密 DWS gs_encrypt 的数据'
 \echo '-----------------------------------------'
 \echo '注意：这里需要你提供实际的 gs_encrypt 加密结果'
 \echo ''
@@ -79,7 +79,7 @@ SELECT sm4_c_encrypt_cbc_gs('Test Data', '1234567890123456', 'sha256') AS gs_for
 
 SELECT sm4_c_decrypt_cbc_gs(
     sm4_c_encrypt_cbc_gs(
-        'This is a longer text with multiple sentences to test the encryption and decryption compatibility with VastBase gs_encrypt format.',
+        'This is a longer text with multiple sentences to test the encryption and decryption compatibility with DWS gs_encrypt format.',
         'test_password_123',
         'sha256'
     ),
@@ -92,7 +92,7 @@ SELECT sm4_c_decrypt_cbc_gs(
 
 SELECT sm4_c_decrypt_cbc_gs(
     sm4_c_encrypt_cbc_gs(
-        '这是一段中文测试内容，用于验证与VastBase gs_encrypt的兼容性！',
+        '这是一段中文测试内容，用于验证与DWS gs_encrypt的兼容性！',
         '测试密码123',
         'sha256'
     ),
