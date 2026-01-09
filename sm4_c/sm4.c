@@ -13,6 +13,7 @@
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 #include <openssl/kdf.h>
+#include <openssl/hmac.h>
 #endif
 
 /* SM4 S盒 */
@@ -1183,13 +1184,13 @@ int sm4_cbc_decrypt_gs_format(
     size_t binary_len;
     uint8_t version;
     const uint8_t *salt;
-    const uint8_t *hmac_received;
+    const uint8_t *hmac_received;  /* HMAC值（暂不验证） */
     const uint8_t *ciphertext;
     size_t cipher_len;
     uint8_t key[SM4_KEY_SIZE];
     uint8_t iv[SM4_BLOCK_SIZE];
-    uint8_t hmac_key[SM4_KEY_SIZE];
-    uint8_t hmac_computed[64];
+    /* uint8_t hmac_key[SM4_KEY_SIZE]; */  /* 暂时不用 */
+    /* uint8_t hmac_computed[64]; */      /* 暂时不用 */
     unsigned int hmac_len;
     int ret;
     const EVP_MD *md = NULL;
