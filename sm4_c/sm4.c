@@ -1057,7 +1057,7 @@ int sm4_cbc_encrypt_gs_format(
     size_t cipher_len;
     size_t total_len;
     int ret;
-    const size_t RANDOM_PREFIX_LEN = 48;  /* DWS在明文前添加48字节随机数据 */
+    const size_t RANDOM_PREFIX_LEN = 32;  /* DWS在明文前添加32字节随机数据（重新测试） */
 
     if (!password || !hash_algo || !input || !output || !output_len) {
         return -1;
@@ -1200,7 +1200,7 @@ int sm4_cbc_decrypt_gs_format(
     /* 分配临时缓冲区用于解密（包含随机前缀） */
     uint8_t *decrypted_with_random = (uint8_t *)malloc(cipher_len);
     size_t decrypted_len;
-    const size_t RANDOM_PREFIX_LEN = 48;  /* DWS在明文前添加48字节随机数据 */
+    const size_t RANDOM_PREFIX_LEN = 32;  /* DWS在明文前添加32字节随机数据（重新测试） */
         
     if (!decrypted_with_random) {
         free(binary_data);
