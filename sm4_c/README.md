@@ -226,7 +226,7 @@ vsql -d test01
 - ✅ 完全兼容 DWS `gs_encrypt` 函数格式
 - ✅ 支持 SHA256/SHA384/SHA512/SM3 哈希算法
 - ✅ Base64 编码输出，与数据库一致
-- ✅ 自动识别算法类型，无需指定
+- ✅ 需要明确指定哈希算法（DWS不在数据中存储）
 - ✅ 可解密 DWS `gs_encrypt` 加密的数据
 
 **函数说明**：
@@ -234,16 +234,16 @@ vsql -d test01
 -- 加密（需指定哈希算法）
 sm4_c_encrypt_cbc_gs(plaintext, password, hash_algo) -> text (Base64)
 
--- 解密（自动识别算法）
-sm4_c_decrypt_cbc_gs(ciphertext_base64, password) -> text
+-- 解密（也需指定哈希算法）
+sm4_c_decrypt_cbc_gs(ciphertext_base64, password, hash_algo) -> text
 ```
 
 **数据格式**：
 ```
-Base64([版本号 1字节] + [算法类型 1字节] + [保留 6字节] + [盐值 16字节] + [密文])
+Base64([版本号 1字节] + [保留 7字节] + [盐值 16字节] + [密文])
 
 版本号: 0x03
-算法类型: 0=SHA256, 1=SHA384, 2=SHA512, 3=SM3
+保留字段: 全零 (DWS不在数据中存储哈希算法类型)
 ```
 
 **使用示例**：
@@ -252,16 +252,18 @@ Base64([版本号 1字节] + [算法类型 1字节] + [保留 6字节] + [盐值
 SELECT sm4_c_encrypt_cbc_gs('Hello World!', '1234567890123456', 'sha256');
 -- 输出: AwAAAAAAAA... (Base64)
 
--- 解密 GS 格式数据
+-- 解密 GS 格式数据（需指定哈希算法）
 SELECT sm4_c_decrypt_cbc_gs(
     'AwAAAAAAAAChP0tyh4nwLniN0WHlBFRMPD0qMvXaiNiZbvg/scBf48YKuse1HhuqmUy91ZVEGGzWBt1D1IHRHRTgSjbgCDG7s8lBRwo06umf4qKLufbp0Q==',
-    '1234567890123456'
+    '1234567890123456',
+    'sha256'
 );
 
 -- 加解密验证
 SELECT sm4_c_decrypt_cbc_gs(
     sm4_c_encrypt_cbc_gs('Test Data', 'password', 'sha256'),
-    'password'
+    'password',
+    'sha256'
 );
 ```
 

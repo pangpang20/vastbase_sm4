@@ -154,7 +154,7 @@ sm4_c_decrypt_cbc_kdf(bytea, password, hash_algo) RETURNS text
 
 -- 🎯 兼容DWS gs_encrypt格式
 sm4_c_encrypt_cbc_gs(text, password, hash_algo) RETURNS text  -- Base64
-sm4_c_decrypt_cbc_gs(text, password) RETURNS text  -- 自动识别算法
+sm4_c_decrypt_cbc_gs(text, password, hash_algo) RETURNS text  -- 需指定算法
 
 -- GCM模式（认证加密）
 sm4_c_encrypt_gcm(text, key, iv, aad) RETURNS bytea
@@ -204,7 +204,8 @@ SELECT sm4_c_encrypt_cbc_gs('Hello World!', '1234567890123456', 'sha256');
 -- 解密DWS gs_encrypt加密的数据
 SELECT sm4_c_decrypt_cbc_gs(
     'AwAAAAAAAAChP0tyh4nwLniN0WHlBFRMPD0qMvXaiNiZbvg/scBf48YKuse1HhuqmUy91ZVEGGzWBt1D1IHRHRTgSjbgCDG7s8lBRwo06umf4qKLufbp0Q==',
-    '1234567890123456'
+    '1234567890123456',
+    'sha256'
 );
 ```
 
