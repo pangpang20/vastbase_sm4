@@ -1308,7 +1308,7 @@ int sm4_cbc_decrypt_gs_format(
     /* 清理敏感数据 */
     memset(key, 0, sizeof(key));
     memset(iv, 0, sizeof(iv));
-    memset(hmac_key, 0, sizeof(hmac_key));
+    /* memset(hmac_key, 0, sizeof(hmac_key)); */  /* 暂时不用 */
     free(binary_data);
     
     if (ret != 0) {
