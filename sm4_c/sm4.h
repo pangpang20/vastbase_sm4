@@ -20,6 +20,12 @@ typedef struct {
 } sm4_context;
 
 /*
+ * 清零SM4上下文中的轮密钥
+ * @param ctx: SM4上下文
+ */
+void sm4_context_clean(sm4_context *ctx);
+
+/*
  * SM4密钥扩展
  * @param ctx: SM4上下文
  * @param key: 16字节密钥

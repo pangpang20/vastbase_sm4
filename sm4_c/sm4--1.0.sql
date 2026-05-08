@@ -88,6 +88,44 @@ RETURNS text
 AS 'sm4', 'sm4_decrypt_gcm_base64'
 LANGUAGE C IMMUTABLE;
 
-COMMENT ON FUNCTION sm4_c_decrypt_gcm_base64(text, text, text, text) IS 
+COMMENT ON FUNCTION sm4_c_decrypt_gcm_base64(text, text, text, text) IS
 'SM4 GCM模式解密(C扩展)，接收Base64编码。参数: ciphertext_base64-Base64编码的密文+Tag, key-密钥, iv-初始向量(12或16字节，或24/32位十六进制，必须与加密时相同), aad-附加认证数据(可选)。返回明文。';
+
+-- GCM模式加密 (自动生成IV) - C扩展版本
+-- 返回: IV(12字节) + 密文 + Tag(16字节)
+CREATE OR REPLACE FUNCTION sm4_c_encrypt_gcm_auto_iv(plaintext text, key text, aad text DEFAULT NULL)
+RETURNS bytea
+AS 'sm4', 'sm4_encrypt_gcm_auto_iv'
+LANGUAGE C IMMUTABLE;
+
+COMMENT ON FUNCTION sm4_c_encrypt_gcm_auto_iv(text, text, text) IS
+'SM4 GCM模式加密(C扩展)，自动生成12字节随机IV。参数: plaintext-明文, key-密钥(16字节或32位十六进制), aad-附加认证数据(可选)。返回IV(12)+密文+Tag(16)。';
+
+-- GCM模式解密 (自动提取IV) - C扩展版本
+-- 从输入的前12字节提取IV
+CREATE OR REPLACE FUNCTION sm4_c_decrypt_gcm_auto_iv(ciphertext bytea, key text, aad text DEFAULT NULL)
+RETURNS text
+AS 'sm4', 'sm4_decrypt_gcm_auto_iv'
+LANGUAGE C IMMUTABLE;
+
+COMMENT ON FUNCTION sm4_c_decrypt_gcm_auto_iv(bytea, text, text) IS
+'SM4 GCM模式解密(C扩展)，自动从密文前12字节提取IV。参数: ciphertext-密文(IV+密文+Tag), key-密钥, aad-附加认证数据(可选)。返回明文。';
+
+-- GCM模式加密 (自动生成IV, Base64版本) - C扩展版本
+CREATE OR REPLACE FUNCTION sm4_c_encrypt_gcm_auto_iv_base64(plaintext text, key text, aad text DEFAULT NULL)
+RETURNS text
+AS 'sm4', 'sm4_encrypt_gcm_auto_iv_base64'
+LANGUAGE C IMMUTABLE;
+
+COMMENT ON FUNCTION sm4_c_encrypt_gcm_auto_iv_base64(text, text, text) IS
+'SM4 GCM模式加密(C扩展)，自动生成IV，返回Base64编码。参数: plaintext-明文, key-密钥, aad-附加认证数据(可选)。返回Base64编码的IV+密文+Tag。';
+
+-- GCM模式解密 (自动提取IV, Base64版本) - C扩展版本
+CREATE OR REPLACE FUNCTION sm4_c_decrypt_gcm_auto_iv_base64(ciphertext_base64 text, key text, aad text DEFAULT NULL)
+RETURNS text
+AS 'sm4', 'sm4_decrypt_gcm_auto_iv_base64'
+LANGUAGE C IMMUTABLE;
+
+COMMENT ON FUNCTION sm4_c_decrypt_gcm_auto_iv_base64(text, text, text) IS
+'SM4 GCM模式解密(C扩展)，从Base64解码后自动提取IV。参数: ciphertext_base64-Base64编码的密文, key-密钥, aad-附加认证数据(可选)。返回明文。';
 

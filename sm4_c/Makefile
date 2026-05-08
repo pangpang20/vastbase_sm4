@@ -23,7 +23,7 @@ TARGET = sm4.so
 LIBDIR = $(VBHOME)/lib/postgresql
 EXTDIR = $(VBHOME)/share/postgresql/extension
 
-.PHONY: all clean install
+.PHONY: all clean install test
 
 all: $(TARGET)
 
@@ -43,4 +43,10 @@ install: $(TARGET)
 	@echo "安装完成!"
 
 clean:
-	rm -f $(OBJS) $(TARGET)
+	rm -f $(OBJS) $(TARGET) test_sm4_unit
+
+test: test_sm4_unit
+	./test_sm4_unit
+
+test_sm4_unit: test_sm4_unit.c sm4.c sm4.h
+	$(CXX) $(CXXFLAGS) -o $@ test_sm4_unit.c sm4.c $(LDFLAGS)

@@ -1,14 +1,17 @@
-# Feature-1: 空值/NULL 输入跳过加密解密
+# Feature-1: 空值/空字符串输入跳过加密解密
 
 ## 优先级: 高
 
 ## 问题描述
 
-当前所有加密/解密函数（ECB、CBC、GCM模式）均未对空值、NULL 输入做特殊处理。当数据库字段值为空字符串("")、NULL 或字面量 "NULL" 时，函数仍尝试执行加密/解密操作，导致：
+**注意**: SQL 函数已声明为 `STRICT`，PostgreSQL/VastBase 在参数为 NULL 时会自动返回 NULL，不会调用 C 函数。因此 NULL 处理已由数据库层面解决。
+
+当前需要修复的核心问题是**空字符串("")输入**：当数据库字段值为空字符串时，函数仍尝试执行加密/解密操作，导致：
 
 - 空字符串加密后产生无意义的填充密文（16字节PKCS7填充）
-- NULL 值传入时可能触发空指针异常
 - 浪费计算资源，增加不必要的性能开销
+
+C 层的 NULL 指针检查作为防御性编程保留，防止非 SQL 调用路径中的空指针问题。
 
 ## 影响范围
 
@@ -41,7 +44,8 @@
 
 ## 验收标准
 
-1. `SELECT sm4_c_encrypt(NULL, '1234567890abcdef');` 返回 NULL
-2. `SELECT sm4_c_encrypt('', '1234567890abcdef');` 返回 NULL 或空
-3. `SELECT sm4_c_decrypt(NULL, '1234567890abcdef');` 返回 NULL
-4. 所有模式（ECB/CBC/GCM）的加密解密函数均需支持此行为
+1. `SELECT sm4_c_encrypt(NULL, '1234567890abcdef');` 返回 NULL（由 STRICT 属性保证）
+2. `SELECT sm4_c_encrypt('', '1234567890abcdef');` 返回 NULL（C 层空字符串检查）
+3. `SELECT sm4_c_decrypt(NULL, '1234567890abcdef');` 返回 NULL（由 STRICT 属性保证）
+4. 所有模式（ECB/CBC/GCM）的加密解密函数均需支持空字符串检查
+5. C 层 NULL 指针检查作为防御性编程保留

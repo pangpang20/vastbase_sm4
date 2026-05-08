@@ -109,6 +109,16 @@ static uint32_t sm4_t_prime(uint32_t x)
     return sm4_l_prime(sm4_tau(x));
 }
 
+/* 清零SM4上下文 */
+void sm4_context_clean(sm4_context *ctx)
+{
+    volatile uint32_t *rk = ctx->rk;
+    int i;
+    for (i = 0; i < SM4_NUM_ROUNDS; i++) {
+        rk[i] = 0;
+    }
+}
+
 /* 密钥扩展 */
 void sm4_setkey(sm4_context *ctx, const uint8_t *key)
 {
@@ -126,6 +136,9 @@ void sm4_setkey(sm4_context *ctx, const uint8_t *key)
         k[i + 4] = k[i] ^ sm4_t_prime(k[i + 1] ^ k[i + 2] ^ k[i + 3] ^ SM4_CK[i]);
         ctx->rk[i] = k[i + 4];
     }
+
+    /* 清零中间状态，防止密钥材料残留在栈上 */
+    memset(k, 0, sizeof(k));
 }
 
 /* 加密单个块 */
@@ -150,6 +163,9 @@ void sm4_encrypt_block(const sm4_context *ctx, const uint8_t *input, uint8_t *ou
     store_u32_be(output + 4, x[34]);
     store_u32_be(output + 8, x[33]);
     store_u32_be(output + 12, x[32]);
+
+    /* 清零中间状态 */
+    memset(x, 0, sizeof(x));
 }
 
 /* 解密单个块 */
@@ -174,6 +190,9 @@ void sm4_decrypt_block(const sm4_context *ctx, const uint8_t *input, uint8_t *ou
     store_u32_be(output + 4, x[34]);
     store_u32_be(output + 8, x[33]);
     store_u32_be(output + 12, x[32]);
+
+    /* 清零中间状态 */
+    memset(x, 0, sizeof(x));
 }
 
 /* PKCS7填充 */
@@ -228,15 +247,20 @@ int sm4_ecb_encrypt(const uint8_t *key, const uint8_t *input, size_t input_len,
         return -1;
     }
 
+    /* 输入长度溢出检查 (Feature-15) */
+    if (input_len > (SIZE_MAX - SM4_BLOCK_SIZE)) {
+        return -1;
+    }
+
     /* 计算填充后的长度 */
     padded_len = input_len + SM4_BLOCK_SIZE - (input_len % SM4_BLOCK_SIZE);
-    
+
     /* 临时缓冲区用于填充 */
     padded = (uint8_t *)malloc(padded_len);
     if (!padded) {
         return -1;
     }
-    
+
     pkcs7_pad(input, input_len, padded);
     sm4_setkey(&ctx, key);
 
@@ -245,6 +269,9 @@ int sm4_ecb_encrypt(const uint8_t *key, const uint8_t *input, size_t input_len,
         sm4_encrypt_block(&ctx, padded + i, output + i);
     }
 
+    /* 清零敏感数据 */
+    sm4_context_clean(&ctx);
+    memset(padded, 0, padded_len);
     free(padded);
     *output_len = padded_len;
     return 0;
@@ -272,6 +299,9 @@ int sm4_ecb_decrypt(const uint8_t *key, const uint8_t *input, size_t input_len,
         sm4_decrypt_block(&ctx, input + i, output + i);
     }
 
+    /* 清零上下文 */
+    sm4_context_clean(&ctx);
+
     /* 去除填充 */
     if (pkcs7_unpad(output, input_len, output_len) != 0) {
         return -1;
@@ -296,13 +326,18 @@ int sm4_cbc_encrypt(const uint8_t *key, const uint8_t *iv,
         return -1;
     }
 
+    /* 输入长度溢出检查 */
+    if (input_len > (SIZE_MAX - SM4_BLOCK_SIZE)) {
+        return -1;
+    }
+
     padded_len = input_len + SM4_BLOCK_SIZE - (input_len % SM4_BLOCK_SIZE);
-    
+
     padded = (uint8_t *)malloc(padded_len);
     if (!padded) {
         return -1;
     }
-    
+
     pkcs7_pad(input, input_len, padded);
     sm4_setkey(&ctx, key);
     memcpy(prev, iv, SM4_BLOCK_SIZE);
@@ -317,6 +352,11 @@ int sm4_cbc_encrypt(const uint8_t *key, const uint8_t *iv,
         memcpy(prev, output + i, SM4_BLOCK_SIZE);
     }
 
+    /* 清零敏感数据 */
+    sm4_context_clean(&ctx);
+    memset(block, 0, sizeof(block));
+    memset(prev, 0, sizeof(prev));
+    memset(padded, 0, padded_len);
     free(padded);
     *output_len = padded_len;
     return 0;
@@ -352,6 +392,11 @@ int sm4_cbc_decrypt(const uint8_t *key, const uint8_t *iv,
         }
         memcpy(prev, input + i, SM4_BLOCK_SIZE);
     }
+
+    /* 清零敏感数据 */
+    sm4_context_clean(&ctx);
+    memset(block, 0, sizeof(block));
+    memset(prev, 0, sizeof(prev));
 
     /* 去除填充 */
     if (pkcs7_unpad(output, input_len, output_len) != 0) {
@@ -477,13 +522,21 @@ int sm4_gcm_encrypt(const uint8_t *key, const uint8_t *iv, size_t iv_len,
     sm4_context ctx;
     uint8_t h[16] = {0};
     uint8_t j0[16];
-    uint8_t ghash_input[1024];
+    uint8_t *ghash_input = NULL;
+    size_t ghash_buf_size;
     size_t ghash_len = 0;
     uint64_t aad_bits, input_bits;
     uint8_t s[16];
     int i;
 
     if (!key || !iv || !output || !tag) {
+        return -1;
+    }
+
+    /* 动态分配 GHASH 输入缓冲区: aad_padded + cipher_padded + 16(length) */
+    ghash_buf_size = ((aad_len + 15) / 16) * 16 + ((input_len + 15) / 16) * 16 + 16;
+    ghash_input = (uint8_t *)malloc(ghash_buf_size);
+    if (!ghash_input) {
         return -1;
     }
 
@@ -525,7 +578,7 @@ int sm4_gcm_encrypt(const uint8_t *key, const uint8_t *iv, size_t iv_len,
     gctr(&ctx, icb, input, input_len, output);
 
     /* 构造GHASH输入: AAD || 0* || C || 0* || len(AAD) || len(C) */
-    memset(ghash_input, 0, sizeof(ghash_input));
+    memset(ghash_input, 0, ghash_buf_size);
     ghash_len = 0;
 
     /* 添加AAD */
@@ -562,6 +615,12 @@ int sm4_gcm_encrypt(const uint8_t *key, const uint8_t *iv, size_t iv_len,
     /* Tag = MSB(GCTR(K, J0, S)) */
     gctr(&ctx, j0, s, 16, tag);
 
+    /* 清零敏感数据 */
+    sm4_context_clean(&ctx);
+    memset(h, 0, sizeof(h));
+    memset(j0, 0, sizeof(j0));
+    memset(s, 0, sizeof(s));
+    free(ghash_input);
     return 0;
 }
 
@@ -574,7 +633,8 @@ int sm4_gcm_decrypt(const uint8_t *key, const uint8_t *iv, size_t iv_len,
     sm4_context ctx;
     uint8_t h[16] = {0};
     uint8_t j0[16];
-    uint8_t ghash_input[1024];
+    uint8_t *ghash_input = NULL;
+    size_t ghash_buf_size;
     size_t ghash_len = 0;
     uint64_t aad_bits, input_bits;
     uint8_t s[16];
@@ -582,6 +642,13 @@ int sm4_gcm_decrypt(const uint8_t *key, const uint8_t *iv, size_t iv_len,
     int i;
 
     if (!key || !iv || !input || !tag || !output) {
+        return -1;
+    }
+
+    /* 动态分配 GHASH 输入缓冲区 */
+    ghash_buf_size = ((aad_len + 15) / 16) * 16 + ((input_len + 15) / 16) * 16 + 16;
+    ghash_input = (uint8_t *)malloc(ghash_buf_size);
+    if (!ghash_input) {
         return -1;
     }
 
@@ -615,7 +682,7 @@ int sm4_gcm_decrypt(const uint8_t *key, const uint8_t *iv, size_t iv_len,
     }
 
     /* 构造GHASH输入用于验证 */
-    memset(ghash_input, 0, sizeof(ghash_input));
+    memset(ghash_input, 0, ghash_buf_size);
     ghash_len = 0;
 
     /* 添加AAD */
@@ -650,9 +717,19 @@ int sm4_gcm_decrypt(const uint8_t *key, const uint8_t *iv, size_t iv_len,
     /* 计算Tag */
     gctr(&ctx, j0, s, 16, computed_tag);
 
-    /* 验证Tag */
-    for (i = 0; i < 16; i++) {
-        if (computed_tag[i] != tag[i]) {
+    /* 常量时间验证Tag，防止时序侧信道攻击 (Feature-3) */
+    {
+        uint8_t diff = 0;
+        for (i = 0; i < 16; i++) {
+            diff |= computed_tag[i] ^ tag[i];
+        }
+        if (diff != 0) {
+            sm4_context_clean(&ctx);
+            memset(h, 0, sizeof(h));
+            memset(j0, 0, sizeof(j0));
+            memset(s, 0, sizeof(s));
+            memset(computed_tag, 0, sizeof(computed_tag));
+            free(ghash_input);
             return -1;  /* 认证失败 */
         }
     }
@@ -663,6 +740,14 @@ int sm4_gcm_decrypt(const uint8_t *key, const uint8_t *iv, size_t iv_len,
     gcm_inc32(icb);
     gctr(&ctx, icb, input, input_len, output);
 
+    /* 清零敏感数据 */
+    sm4_context_clean(&ctx);
+    memset(h, 0, sizeof(h));
+    memset(j0, 0, sizeof(j0));
+    memset(s, 0, sizeof(s));
+    memset(computed_tag, 0, sizeof(computed_tag));
+    memset(icb, 0, sizeof(icb));
+    free(ghash_input);
     return 0;
 }
 
@@ -681,7 +766,7 @@ static int derive_key_and_iv(
 {
     const EVP_MD *md = NULL;
     uint8_t derived[32];
-    int iterations = 10000;
+    int iterations = 600000;  /* OWASP 2023 推荐 PBKDF2-SHA256 最低迭代次数 */
 
     /* 选择哈希算法 */
     if (strcmp(hash_algo, "sha256") == 0) {

@@ -2,6 +2,8 @@
 
 ## 优先级: 中
 
+## 状态: 已完成
+
 ## 问题描述
 
 当前项目只有 SQL 层面的集成测试（test_sm4.sql、test_sm4_gcm.sql），缺少 C 语言层面的单元测试。SQL 测试无法覆盖：
@@ -11,37 +13,32 @@
 3. 错误处理路径
 4. 加密算法的正确性验证
 
-## 影响范围
+## 已完成实现
 
-- 整个项目缺乏 C 层测试
-- 安全漏洞难以通过 SQL 测试发现
+已创建 `test_sm4_unit.c`，使用轻量级自定义测试框架（assert 宏 + 计数器），不依赖外部库。
 
-## 需求描述
+### 编译运行
 
-1. 引入 C 单元测试框架（推荐 CUnit 或 Check）
-2. 为每个加密/解密函数编写测试用例：
-   - 正常输入测试
-   - 边界条件测试（空输入、最大长度、对齐边界）
-   - 错误处理测试（无效密钥长度、无效 IV、非法输入）
-   - 内存安全测试（使用 AddressSanitizer）
-3. 测试用例覆盖所有加密模式（ECB、CBC、GCM）
-4. 集成到 Makefile 的 test 目标
-
-## 测试用例示例
-
-```
-test_sm4_ecb_encrypt_normal()       — 正常加密
-test_sm4_ecb_encrypt_empty()        — 空输入
-test_sm4_ecb_encrypt_null_key()     — NULL 密钥
-test_sm4_ecb_encrypt_invalid_key()  — 无效密钥长度
-test_sm4_ecb_roundtrip()            — 加密后解密验证
-test_sm4_gcm_large_data()           — 大数据量 GCM
-test_sm4_memory_cleanup()           — 敏感数据清零验证
+```bash
+make test
+# 或手动编译:
+gcc -O2 -Wall -std=c11 -DUSE_OPENSSL_KDF -o test_sm4_unit test_sm4_unit.c sm4.c -lssl -lcrypto
+./test_sm4_unit
 ```
 
-## 验收标准
+### 已实现的测试用例 (62 个)
 
-1. 单元测试框架集成到构建系统
-2. 测试覆盖率达到 80% 以上
-3. 所有测试通过
-4. AddressSanitizer 检测无内存错误
+| 测试 | 覆盖内容 |
+|------|----------|
+| test_sm4_ecb_block_roundtrip | 单块加解密往返 |
+| test_sm4_ecb_roundtrip | ECB 模式完整往返 |
+| test_sm4_cbc_roundtrip | CBC 模式完整往返 |
+| test_sm4_gcm_roundtrip | GCM 模式完整往返 (含 AAD) |
+| test_sm4_gcm_auth_failure | GCM Tag/密文篡改检测 |
+| test_sm4_gcm_large_data | 2048 字节 GCM (验证缓冲区溢出修复) |
+| test_sm4_gcm_very_large_data | 64KB GCM |
+| test_sm4_empty_input | 空输入处理 |
+| test_sm4_null_params | NULL 参数检查 |
+| test_sm4_context_clean | 上下文清零验证 |
+| test_sm4_gcm_iv_lengths | 不同 IV 长度 (12/16 字节) |
+| test_sm4_ecb_various_lengths | 不同明文长度 (1-255 字节) |

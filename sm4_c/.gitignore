@@ -53,3 +53,6 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+# test binaries
+test_sm4_unit
