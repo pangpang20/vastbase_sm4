@@ -133,4 +133,71 @@ SELECT
         ELSE '✗ 失败' 
     END AS test_result;
 
+-- 测试12: Auto IV - 基本加密解密
+\echo '测试12: Auto IV 基本加密解密'
+SELECT
+    sm4_c_decrypt_gcm_auto_iv(
+        sm4_c_encrypt_gcm_auto_iv('Hello Auto IV!', '1234567890123456'),
+        '1234567890123456'
+    ) AS decrypted;
+
+-- 测试13: Auto IV - 带AAD
+\echo '测试13: Auto IV 带AAD'
+SELECT
+    sm4_c_decrypt_gcm_auto_iv(
+        sm4_c_encrypt_gcm_auto_iv('Secret Auto IV', '1234567890123456', 'user:1001'),
+        '1234567890123456',
+        'user:1001'
+    ) AS decrypted;
+
+-- 测试14: Auto IV - 两次加密产生不同密文（随机IV）
+\echo '测试14: Auto IV 随机性验证（两次加密应产生不同密文）'
+SELECT
+    CASE WHEN
+        sm4_c_encrypt_gcm_auto_iv('same plaintext', '1234567890123456')
+        != sm4_c_encrypt_gcm_auto_iv('same plaintext', '1234567890123456')
+    THEN '✓ 通过: 两次加密产生不同密文（IV随机）'
+    ELSE '✗ 失败: 两次加密结果相同'
+    END AS random_iv_test;
+
+-- 测试15: Auto IV - AAD不匹配应失败
+\echo '测试15: Auto IV AAD验证失败测试'
+DO $$
+DECLARE
+    encrypted bytea;
+BEGIN
+    encrypted := sm4_c_encrypt_gcm_auto_iv('Test', '1234567890123456', 'correct aad');
+    BEGIN
+        PERFORM sm4_c_decrypt_gcm_auto_iv(encrypted, '1234567890123456', 'wrong aad');
+        RAISE NOTICE '错误: AAD验证应该失败但成功了';
+    EXCEPTION WHEN OTHERS THEN
+        RAISE NOTICE '✓ 正确: AAD验证失败，错误信息: %', SQLERRM;
+    END;
+END $$;
+
+-- 测试16: Auto IV Base64 - 基本加密解密
+\echo '测试16: Auto IV Base64 基本加密解密'
+SELECT
+    sm4_c_decrypt_gcm_auto_iv_base64(
+        sm4_c_encrypt_gcm_auto_iv_base64('Hello Base64 Auto IV!', '1234567890123456'),
+        '1234567890123456'
+    ) AS decrypted;
+
+-- 测试17: Auto IV Base64 - 带AAD
+\echo '测试17: Auto IV Base64 带AAD'
+SELECT
+    sm4_c_decrypt_gcm_auto_iv_base64(
+        sm4_c_encrypt_gcm_auto_iv_base64('Secret Base64', '1234567890123456', 'session:abc'),
+        '1234567890123456',
+        'session:abc'
+    ) AS decrypted;
+
+-- 测试18: Auto IV Base64 - 中文和特殊字符
+\echo '测试18: Auto IV Base64 中文加密'
+SELECT
+    sm4_c_decrypt_gcm_auto_iv_base64(
+        sm4_c_encrypt_gcm_auto_iv_base64('中文测试数据！@#', '1234567890123456'),
+        '1234567890123456'
+    ) AS decrypted;
+
 \echo '=== 测试完成 ==='

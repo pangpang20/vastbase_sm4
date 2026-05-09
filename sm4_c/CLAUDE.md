@@ -63,6 +63,8 @@ Three source files, compiled into a single `sm4.so` shared library:
 | `sm4_c_encrypt_cbc` / `sm4_c_decrypt_cbc` | CBC | bytea / text |
 | `sm4_c_encrypt_gcm` / `sm4_c_decrypt_gcm` | GCM | bytea (cipher+tag) / text |
 | `sm4_c_encrypt_gcm_base64` / `sm4_c_decrypt_gcm_base64` | GCM | text (Base64) |
+| `sm4_c_encrypt_gcm_auto_iv` / `sm4_c_decrypt_gcm_auto_iv` | GCM (auto IV) | bytea (IV+cipher+tag) / text |
+| `sm4_c_encrypt_gcm_auto_iv_base64` / `sm4_c_decrypt_gcm_auto_iv_base64` | GCM (auto IV) | text (Base64) |
 
 ## Key Conventions
 
