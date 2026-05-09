@@ -313,6 +313,54 @@ vsql -d test01 -f test_sm4_gcm.sql
 vsql -d test01 -f demo_citizen_data.sql
 ```
 
+## 空值和NULL处理
+
+所有函数对空字符串 `''` 和 `NULL` 输入统一返回空结果，不会报错。
+
+```sql
+-- ECB模式 (bytea)
+SELECT sm4_c_encrypt('', '1234567890abcdef');
+SELECT sm4_c_encrypt(NULL, '1234567890abcdef');
+SELECT sm4_c_decrypt('', '1234567890abcdef');
+SELECT sm4_c_decrypt(NULL, '1234567890abcdef');
+
+-- ECB模式 (hex)
+SELECT sm4_c_encrypt_hex('', '1234567890abcdef');
+SELECT sm4_c_encrypt_hex(NULL, '1234567890abcdef');
+SELECT sm4_c_decrypt_hex('', '1234567890abcdef');
+SELECT sm4_c_decrypt_hex(NULL, '1234567890abcdef');
+
+-- CBC模式
+SELECT sm4_c_encrypt_cbc('', '1234567890abcdef', 'abcdef1234567890');
+SELECT sm4_c_encrypt_cbc(NULL, '1234567890abcdef', 'abcdef1234567890');
+SELECT sm4_c_decrypt_cbc('', '1234567890abcdef', 'abcdef1234567890');
+SELECT sm4_c_decrypt_cbc(NULL, '1234567890abcdef', 'abcdef1234567890');
+
+-- GCM模式
+SELECT sm4_c_encrypt_gcm('', '1234567890123456', '123456789012');
+SELECT sm4_c_encrypt_gcm(NULL, '1234567890123456', '123456789012');
+SELECT sm4_c_decrypt_gcm('', '1234567890123456', '123456789012');
+SELECT sm4_c_decrypt_gcm(NULL, '1234567890123456', '123456789012');
+
+-- GCM模式 (Base64)
+SELECT sm4_c_encrypt_gcm_base64('', '1234567890123456', '123456789012');
+SELECT sm4_c_encrypt_gcm_base64(NULL, '1234567890123456', '123456789012');
+SELECT sm4_c_decrypt_gcm_base64('', '1234567890123456', '123456789012');
+SELECT sm4_c_decrypt_gcm_base64(NULL, '1234567890123456', '123456789012');
+
+-- GCM模式 (Auto IV)
+SELECT sm4_c_encrypt_gcm_auto_iv('', '1234567890123456');
+SELECT sm4_c_encrypt_gcm_auto_iv(NULL, '1234567890123456');
+SELECT sm4_c_decrypt_gcm_auto_iv('', '1234567890123456');
+SELECT sm4_c_decrypt_gcm_auto_iv(NULL, '1234567890123456');
+
+-- GCM模式 (Auto IV Base64)
+SELECT sm4_c_encrypt_gcm_auto_iv_base64('', '1234567890123456');
+SELECT sm4_c_encrypt_gcm_auto_iv_base64(NULL, '1234567890123456');
+SELECT sm4_c_decrypt_gcm_auto_iv_base64('', '1234567890123456');
+SELECT sm4_c_decrypt_gcm_auto_iv_base64(NULL, '1234567890123456');
+```
+
 ## 加密模式对比
 
 | 特性 | ECB模式 | 标准CBC模式 | GCM模式 |
