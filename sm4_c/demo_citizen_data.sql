@@ -45,7 +45,7 @@ COMMENT ON COLUMN citizen_info.phone_encrypted IS '手机号码(SM4加密存储)
 
 \echo ''
 \echo '========================================'
-\echo '插入测试数据(20条)'
+\echo '插入测试数据(25条，含空值/NULL)'
 \echo '========================================'
 
 -- 插入20条测试数据
@@ -169,7 +169,37 @@ VALUES
 ('赵艳', 'F', '1997-02-14',
  sm4_c_encrypt_gcm_base64('220101199702141234', :ENCRYPTION_KEY, :ENCRYPTION_KEY),
  sm4_c_encrypt_gcm_base64('13800138020', :ENCRYPTION_KEY, :ENCRYPTION_KEY),
- '吉林省', '长春市', '朝阳区', '人民大街138号', 'active', NULL);
+ '吉林省', '长春市', '朝阳区', '人民大街138号', 'active', NULL),
+
+-- 21: 身份证NULL
+('刘备', 'M', '1960-01-01',
+ NULL,
+ sm4_c_encrypt_gcm_base64('13800138021', :ENCRYPTION_KEY, :ENCRYPTION_KEY),
+ '四川省', '成都市', '武侯区', '武侯祠大街231号', 'active', '身份证信息缺失'),
+
+-- 22: 手机号NULL
+('关羽', 'M', '1962-08-12',
+ sm4_c_encrypt_gcm_base64('140101196208121234', :ENCRYPTION_KEY, :ENCRYPTION_KEY),
+ NULL,
+ '山西省', '运城市', '解州区', '关帝庙街1号', 'active', '手机号未登记'),
+
+-- 23: 身份证和手机号均为NULL
+('张飞', 'M', '1966-05-20',
+ NULL,
+ NULL,
+ '河北省', '保定市', '涿州市', '张飞庙路88号', 'active', '敏感信息均缺失'),
+
+-- 24: 身份证为空字符串
+('诸葛亮', 'M', '1981-07-23',
+ sm4_c_encrypt_gcm_base64('', :ENCRYPTION_KEY, :ENCRYPTION_KEY),
+ sm4_c_encrypt_gcm_base64('13800138024', :ENCRYPTION_KEY, :ENCRYPTION_KEY),
+ '山东省', '临沂市', '沂南县', '卧龙山路1号', 'active', '身份证为空字符串加密'),
+
+-- 25: 手机号为空字符串
+('赵云', 'M', '1990-03-10',
+ sm4_c_encrypt_gcm_base64('130101199003101234', :ENCRYPTION_KEY, :ENCRYPTION_KEY),
+ sm4_c_encrypt_gcm_base64('', :ENCRYPTION_KEY, :ENCRYPTION_KEY),
+ '河北省', '石家庄市', '正定县', '赵云庙路66号', 'active', '手机号为空字符串加密');
 
 \echo ''
 \echo '========================================'
@@ -259,6 +289,47 @@ ORDER BY citizen_count DESC;
 
 \echo ''
 \echo '========================================'
+\echo '查询示例6: 空值/NULL解密行为验证'
+\echo '========================================'
+-- 查看含空值/NULL的记录解密结果
+SELECT
+    citizen_id,
+    name,
+    id_card_encrypted IS NULL AS id_card_is_null,
+    phone_encrypted IS NULL AS phone_is_null,
+    sm4_c_decrypt_gcm_base64(id_card_encrypted, :ENCRYPTION_KEY, :ENCRYPTION_KEY) AS id_card_decrypted,
+    sm4_c_decrypt_gcm_base64(phone_encrypted, :ENCRYPTION_KEY, :ENCRYPTION_KEY) AS phone_decrypted,
+    remark
+FROM citizen_info
+WHERE citizen_id >= 21
+ORDER BY citizen_id;
+
+\echo ''
+\echo '========================================'
+\echo '查询示例7: 空值/NULL的脱敏显示'
+\echo '========================================'
+-- 脱敏视图中NULL/空值的处理
+SELECT
+    citizen_id,
+    name,
+    id_card_encrypted,
+    phone_encrypted,
+    CASE
+        WHEN id_card_encrypted IS NULL THEN '【未登记】'
+        ELSE SUBSTRING(sm4_c_decrypt_gcm_base64(id_card_encrypted, :ENCRYPTION_KEY, :ENCRYPTION_KEY), 1, 6) || '********' ||
+             SUBSTRING(sm4_c_decrypt_gcm_base64(id_card_encrypted, :ENCRYPTION_KEY, :ENCRYPTION_KEY), 15, 4)
+    END AS id_card_display,
+    CASE
+        WHEN phone_encrypted IS NULL THEN '【未登记】'
+        ELSE SUBSTRING(sm4_c_decrypt_gcm_base64(phone_encrypted, :ENCRYPTION_KEY, :ENCRYPTION_KEY), 1, 3) || '****' ||
+             SUBSTRING(sm4_c_decrypt_gcm_base64(phone_encrypted, :ENCRYPTION_KEY, :ENCRYPTION_KEY), 8, 4)
+    END AS phone_display
+FROM citizen_info
+WHERE citizen_id >= 21
+ORDER BY citizen_id;
+
+\echo ''
+\echo '========================================'
 \echo '创建安全查询视图(自动脱敏)'
 \echo '========================================'
 DROP VIEW IF EXISTS citizen_info_masked CASCADE;
@@ -269,12 +340,18 @@ SELECT
     gender,
     birth_date,
     EXTRACT(YEAR FROM age(birth_date)) AS age,
-    -- 自动脱敏的身份证
-    SUBSTRING(sm4_c_decrypt_gcm_base64(id_card_encrypted, :ENCRYPTION_KEY, :ENCRYPTION_KEY), 1, 6) || '********' || 
-    SUBSTRING(sm4_c_decrypt_gcm_base64(id_card_encrypted, :ENCRYPTION_KEY, :ENCRYPTION_KEY), 15, 4) AS id_card,
-    -- 自动脱敏的手机号
-    SUBSTRING(sm4_c_decrypt_gcm_base64(phone_encrypted, :ENCRYPTION_KEY, :ENCRYPTION_KEY), 1, 3) || '****' || 
-    SUBSTRING(sm4_c_decrypt_gcm_base64(phone_encrypted, :ENCRYPTION_KEY, :ENCRYPTION_KEY), 8, 4) AS phone,
+    -- 自动脱敏的身份证(NULL安全)
+    CASE
+        WHEN id_card_encrypted IS NULL THEN '【未登记】'
+        ELSE SUBSTRING(sm4_c_decrypt_gcm_base64(id_card_encrypted, :ENCRYPTION_KEY, :ENCRYPTION_KEY), 1, 6) || '********' ||
+             SUBSTRING(sm4_c_decrypt_gcm_base64(id_card_encrypted, :ENCRYPTION_KEY, :ENCRYPTION_KEY), 15, 4)
+    END AS id_card,
+    -- 自动脱敏的手机号(NULL安全)
+    CASE
+        WHEN phone_encrypted IS NULL THEN '【未登记】'
+        ELSE SUBSTRING(sm4_c_decrypt_gcm_base64(phone_encrypted, :ENCRYPTION_KEY, :ENCRYPTION_KEY), 1, 3) || '****' ||
+             SUBSTRING(sm4_c_decrypt_gcm_base64(phone_encrypted, :ENCRYPTION_KEY, :ENCRYPTION_KEY), 8, 4)
+    END AS phone,
     province,
     city,
     district,
@@ -335,7 +412,7 @@ WHERE citizen_id = 1;
 \echo '========================================'
 \echo '示例完成!'
 \echo '========================================'
-\echo '数据库表: citizen_info (包含20条加密数据)'
+\echo '数据库表: citizen_info (包含25条数据，含空值/NULL测试)'
 \echo '脱敏视图: citizen_info_masked (自动脱敏)'
 \echo '敏感字段: id_card_encrypted, phone_encrypted'
 \echo '加密算法: SM4国密算法'
