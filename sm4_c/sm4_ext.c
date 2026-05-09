@@ -1158,9 +1158,17 @@ sm4_decrypt_gcm_base64(PG_FUNCTION_ARGS)
 extern "C" Datum
 sm4_encrypt_gcm_auto_iv(PG_FUNCTION_ARGS)
 {
-    text *plaintext = PG_GETARG_TEXT_PP(0);
-    text *key = PG_GETARG_TEXT_PP(1);
-    text *aad_text = PG_ARGISNULL(2) ? NULL : PG_GETARG_TEXT_PP(2);
+    text *plaintext;
+    text *key;
+    text *aad_text;
+
+    /* NULL输入检查 */
+    if (PG_ARGISNULL(0) || PG_ARGISNULL(1))
+        PG_RETURN_NULL();
+
+    plaintext = PG_GETARG_TEXT_PP(0);
+    key = PG_GETARG_TEXT_PP(1);
+    aad_text = PG_ARGISNULL(2) ? NULL : PG_GETARG_TEXT_PP(2);
 
     uint8_t key_bytes[SM4_KEY_SIZE];
     uint8_t iv_bytes[SM4_GCM_IV_SIZE];
@@ -1250,9 +1258,17 @@ sm4_encrypt_gcm_auto_iv(PG_FUNCTION_ARGS)
 extern "C" Datum
 sm4_decrypt_gcm_auto_iv(PG_FUNCTION_ARGS)
 {
-    bytea *ciphertext = PG_GETARG_BYTEA_PP(0);
-    text *key = PG_GETARG_TEXT_PP(1);
-    text *aad_text = PG_ARGISNULL(2) ? NULL : PG_GETARG_TEXT_PP(2);
+    bytea *ciphertext;
+    text *key;
+    text *aad_text;
+
+    /* NULL输入检查 */
+    if (PG_ARGISNULL(0) || PG_ARGISNULL(1))
+        PG_RETURN_NULL();
+
+    ciphertext = PG_GETARG_BYTEA_PP(0);
+    key = PG_GETARG_TEXT_PP(1);
+    aad_text = PG_ARGISNULL(2) ? NULL : PG_GETARG_TEXT_PP(2);
 
     uint8_t key_bytes[SM4_KEY_SIZE];
     uint8_t *data;
@@ -1336,9 +1352,17 @@ sm4_decrypt_gcm_auto_iv(PG_FUNCTION_ARGS)
 extern "C" Datum
 sm4_encrypt_gcm_auto_iv_base64(PG_FUNCTION_ARGS)
 {
-    text *plaintext = PG_GETARG_TEXT_PP(0);
-    text *key = PG_GETARG_TEXT_PP(1);
-    text *aad_text = PG_ARGISNULL(2) ? NULL : PG_GETARG_TEXT_PP(2);
+    text *plaintext;
+    text *key;
+    text *aad_text;
+
+    /* NULL输入检查 */
+    if (PG_ARGISNULL(0) || PG_ARGISNULL(1))
+        PG_RETURN_NULL();
+
+    plaintext = PG_GETARG_TEXT_PP(0);
+    key = PG_GETARG_TEXT_PP(1);
+    aad_text = PG_ARGISNULL(2) ? NULL : PG_GETARG_TEXT_PP(2);
 
     uint8_t key_bytes[SM4_KEY_SIZE];
     uint8_t iv_bytes[SM4_GCM_IV_SIZE];
@@ -1437,9 +1461,17 @@ sm4_encrypt_gcm_auto_iv_base64(PG_FUNCTION_ARGS)
 extern "C" Datum
 sm4_decrypt_gcm_auto_iv_base64(PG_FUNCTION_ARGS)
 {
-    text *ciphertext_base64 = PG_GETARG_TEXT_PP(0);
-    text *key = PG_GETARG_TEXT_PP(1);
-    text *aad_text = PG_ARGISNULL(2) ? NULL : PG_GETARG_TEXT_PP(2);
+    text *ciphertext_base64;
+    text *key;
+    text *aad_text;
+
+    /* NULL输入检查 */
+    if (PG_ARGISNULL(0) || PG_ARGISNULL(1))
+        PG_RETURN_NULL();
+
+    ciphertext_base64 = PG_GETARG_TEXT_PP(0);
+    key = PG_GETARG_TEXT_PP(1);
+    aad_text = PG_ARGISNULL(2) ? NULL : PG_GETARG_TEXT_PP(2);
 
     uint8_t key_bytes[SM4_KEY_SIZE];
     char *cipher_base64_str;
