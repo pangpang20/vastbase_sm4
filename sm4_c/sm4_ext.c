@@ -554,11 +554,20 @@ sm4_decrypt_hex(PG_FUNCTION_ARGS)
 extern "C" Datum
 sm4_encrypt_gcm(PG_FUNCTION_ARGS)
 {
-    text *plaintext = PG_GETARG_TEXT_PP(0);
-    text *key = PG_GETARG_TEXT_PP(1);
-    text *iv_text = PG_GETARG_TEXT_PP(2);
-    text *aad_text = PG_ARGISNULL(3) ? NULL : PG_GETARG_TEXT_PP(3);
-    
+    text *plaintext;
+    text *key;
+    text *iv_text;
+    text *aad_text;
+
+    /* NULL输入检查 */
+    if (PG_ARGISNULL(0) || PG_ARGISNULL(1) || PG_ARGISNULL(2))
+        PG_RETURN_NULL();
+
+    plaintext = PG_GETARG_TEXT_PP(0);
+    key = PG_GETARG_TEXT_PP(1);
+    iv_text = PG_GETARG_TEXT_PP(2);
+    aad_text = PG_ARGISNULL(3) ? NULL : PG_GETARG_TEXT_PP(3);
+
     uint8_t key_bytes[SM4_KEY_SIZE];
     uint8_t iv_bytes[SM4_BLOCK_SIZE];  /* 最大支持16字节IV */
     char *plain_str;
@@ -678,11 +687,20 @@ sm4_encrypt_gcm(PG_FUNCTION_ARGS)
 extern "C" Datum
 sm4_decrypt_gcm(PG_FUNCTION_ARGS)
 {
-    bytea *ciphertext_with_tag = PG_GETARG_BYTEA_PP(0);
-    text *key = PG_GETARG_TEXT_PP(1);
-    text *iv_text = PG_GETARG_TEXT_PP(2);
-    text *aad_text = PG_ARGISNULL(3) ? NULL : PG_GETARG_TEXT_PP(3);
-    
+    bytea *ciphertext_with_tag;
+    text *key;
+    text *iv_text;
+    text *aad_text;
+
+    /* NULL输入检查 */
+    if (PG_ARGISNULL(0) || PG_ARGISNULL(1) || PG_ARGISNULL(2))
+        PG_RETURN_NULL();
+
+    ciphertext_with_tag = PG_GETARG_BYTEA_PP(0);
+    key = PG_GETARG_TEXT_PP(1);
+    iv_text = PG_GETARG_TEXT_PP(2);
+    aad_text = PG_ARGISNULL(3) ? NULL : PG_GETARG_TEXT_PP(3);
+
     uint8_t key_bytes[SM4_KEY_SIZE];
     uint8_t iv_bytes[SM4_BLOCK_SIZE];  /* 最大支持16字节IV */
     uint8_t *cipher_with_tag;
@@ -752,6 +770,14 @@ sm4_decrypt_gcm(PG_FUNCTION_ARGS)
     /* 获取密文+Tag */
     cipher_with_tag = (uint8_t *)VARDATA_ANY(ciphertext_with_tag);
     cipher_with_tag_len = VARSIZE_ANY_EXHDR(ciphertext_with_tag);
+
+    /* 空密文检查 */
+    if (cipher_with_tag_len == 0) {
+        memset(key_bytes, 0, sizeof(key_bytes));
+        memset(iv_bytes, 0, sizeof(iv_bytes));
+        if (aad_str) { memset(aad_str, 0, aad_len); pfree(aad_str); }
+        PG_RETURN_NULL();
+    }
 
     /* 检查长度 */
     if (cipher_with_tag_len < SM4_GCM_TAG_SIZE) {
@@ -892,11 +918,20 @@ static uint8_t* base64_decode(const char *input, size_t *out_len)
 extern "C" Datum
 sm4_encrypt_gcm_base64(PG_FUNCTION_ARGS)
 {
-    text *plaintext = PG_GETARG_TEXT_PP(0);
-    text *key = PG_GETARG_TEXT_PP(1);
-    text *iv_text = PG_GETARG_TEXT_PP(2);
-    text *aad_text = PG_ARGISNULL(3) ? NULL : PG_GETARG_TEXT_PP(3);
-    
+    text *plaintext;
+    text *key;
+    text *iv_text;
+    text *aad_text;
+
+    /* NULL输入检查 */
+    if (PG_ARGISNULL(0) || PG_ARGISNULL(1) || PG_ARGISNULL(2))
+        PG_RETURN_NULL();
+
+    plaintext = PG_GETARG_TEXT_PP(0);
+    key = PG_GETARG_TEXT_PP(1);
+    iv_text = PG_GETARG_TEXT_PP(2);
+    aad_text = PG_ARGISNULL(3) ? NULL : PG_GETARG_TEXT_PP(3);
+
     uint8_t key_bytes[SM4_KEY_SIZE];
     uint8_t iv_bytes[SM4_BLOCK_SIZE];
     char *plain_str;
@@ -1021,11 +1056,20 @@ sm4_encrypt_gcm_base64(PG_FUNCTION_ARGS)
 extern "C" Datum
 sm4_decrypt_gcm_base64(PG_FUNCTION_ARGS)
 {
-    text *ciphertext_base64 = PG_GETARG_TEXT_PP(0);
-    text *key = PG_GETARG_TEXT_PP(1);
-    text *iv_text = PG_GETARG_TEXT_PP(2);
-    text *aad_text = PG_ARGISNULL(3) ? NULL : PG_GETARG_TEXT_PP(3);
-    
+    text *ciphertext_base64;
+    text *key;
+    text *iv_text;
+    text *aad_text;
+
+    /* NULL输入检查 */
+    if (PG_ARGISNULL(0) || PG_ARGISNULL(1) || PG_ARGISNULL(2))
+        PG_RETURN_NULL();
+
+    ciphertext_base64 = PG_GETARG_TEXT_PP(0);
+    key = PG_GETARG_TEXT_PP(1);
+    iv_text = PG_GETARG_TEXT_PP(2);
+    aad_text = PG_ARGISNULL(3) ? NULL : PG_GETARG_TEXT_PP(3);
+
     uint8_t key_bytes[SM4_KEY_SIZE];
     uint8_t iv_bytes[SM4_BLOCK_SIZE];
     char *cipher_base64_str;
@@ -1087,6 +1131,17 @@ sm4_decrypt_gcm_base64(PG_FUNCTION_ARGS)
     if (aad_text) {
         aad_str = text_to_cstring(aad_text);
         aad_len = strlen(aad_str);
+    }
+
+    /* 空密文检查 */
+    {
+        size_t b64_len = VARSIZE_ANY_EXHDR(ciphertext_base64);
+        if (b64_len == 0) {
+            memset(key_bytes, 0, sizeof(key_bytes));
+            memset(iv_bytes, 0, sizeof(iv_bytes));
+            if (aad_str) { memset(aad_str, 0, aad_len); pfree(aad_str); }
+            PG_RETURN_NULL();
+        }
     }
 
     /* Base64解码 */
@@ -1299,6 +1354,13 @@ sm4_decrypt_gcm_auto_iv(PG_FUNCTION_ARGS)
     data = (uint8_t *)VARDATA_ANY(ciphertext);
     data_len = VARSIZE_ANY_EXHDR(ciphertext);
 
+    /* 空密文检查 */
+    if (data_len == 0) {
+        memset(key_bytes, 0, sizeof(key_bytes));
+        if (aad_str) { memset(aad_str, 0, aad_len); pfree(aad_str); }
+        PG_RETURN_NULL();
+    }
+
     /* 检查最小长度: IV(12) + Tag(16) = 28 */
     if (data_len < SM4_GCM_IV_SIZE + SM4_GCM_TAG_SIZE) {
         memset(key_bytes, 0, sizeof(key_bytes));
@@ -1497,6 +1559,16 @@ sm4_decrypt_gcm_auto_iv_base64(PG_FUNCTION_ARGS)
     if (aad_text) {
         aad_str = text_to_cstring(aad_text);
         aad_len = strlen(aad_str);
+    }
+
+    /* 空密文检查 */
+    {
+        size_t b64_len = VARSIZE_ANY_EXHDR(ciphertext_base64);
+        if (b64_len == 0) {
+            memset(key_bytes, 0, sizeof(key_bytes));
+            if (aad_str) { memset(aad_str, 0, aad_len); pfree(aad_str); }
+            PG_RETURN_NULL();
+        }
     }
 
     /* Base64解码 */
